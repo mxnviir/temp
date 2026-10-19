@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 760" font-family="system-ui,Segoe UI,Helvetica,Arial,sans-serif">
+<rect width="1500" height="760" fill="#fafaf7"/>
+<path d="M645,380 C600,380 615,130 640,130" stroke="#7a7f8c" stroke-width="2.5" fill="none"/>
+<rect x="470.0" y="110" width="170" height="40" rx="20" fill="#2b3a55"/>
+<text x="555" y="135" text-anchor="middle" fill="#fff" font-size="14" font-weight="600">1. Architecture</text>
+<path d="M470.0,130 C430.0,130 490,79.0 462,79.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="452" cy="79.0" r="6" fill="#1a9e5a"/>
+<text x="436" y="84.0" text-anchor="end" fill="#22252d" font-size="14">Planner + local coder split is real</text>
+<path d="M470.0,130 C430.0,130 490,113.0 462,113.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="452" cy="113.0" r="6" fill="#1a9e5a"/>
+<text x="436" y="118.0" text-anchor="end" fill="#22252d" font-size="14">Exists: Aider architect, Claude Code subagents</text>
+<path d="M470.0,130 C430.0,130 490,147.0 462,147.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="452" cy="147.0" r="6" fill="#1a9e5a"/>
+<text x="436" y="152.0" text-anchor="end" fill="#22252d" font-size="14">Local models: Qwen-Coder, DeepSeek-Coder via Ollama</text>
+<path d="M470.0,130 C430.0,130 490,181.0 462,181.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="452" cy="181.0" r="6" fill="#d98a00"/>
+<text x="436" y="186.0" text-anchor="end" fill="#22252d" font-size="14">Handoff is lossy; errors compound</text>
+<path d="M645,380 C600,380 615,380 640,380" stroke="#7a7f8c" stroke-width="2.5" fill="none"/>
+<rect x="470.0" y="360" width="170" height="40" rx="20" fill="#2b3a55"/>
+<text x="555" y="385" text-anchor="middle" fill="#fff" font-size="14" font-weight="600">2. Token savings</text>
+<path d="M470.0,380 C430.0,380 490,329.0 462,329.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="452" cy="329.0" r="6" fill="#d03a3a"/>
+<text x="436" y="334.0" text-anchor="end" fill="#22252d" font-size="14">&quot;I don&#x27;t use tokens&quot; is mostly false</text>
+<path d="M470.0,380 C430.0,380 490,363.0 462,363.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="452" cy="363.0" r="6" fill="#d98a00"/>
+<text x="436" y="368.0" text-anchor="end" fill="#22252d" font-size="14">Planner still reads code (input tokens)</text>
+<path d="M470.0,380 C430.0,380 490,397.0 462,397.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="452" cy="397.0" r="6" fill="#d98a00"/>
+<text x="436" y="402.0" text-anchor="end" fill="#22252d" font-size="14">Local coder saves output tokens only</text>
+<path d="M470.0,380 C430.0,380 490,431.0 462,431.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="452" cy="431.0" r="6" fill="#1a9e5a"/>
+<text x="436" y="436.0" text-anchor="end" fill="#22252d" font-size="14">Caching / cheap cloud model gets most of it</text>
+<path d="M645,380 C600,380 615,630 640,630" stroke="#7a7f8c" stroke-width="2.5" fill="none"/>
+<rect x="470.0" y="610" width="170" height="40" rx="20" fill="#2b3a55"/>
+<text x="555" y="635" text-anchor="middle" fill="#fff" font-size="14" font-weight="600">3. Robot language</text>
+<path d="M470.0,630 C430.0,630 490,579.0 462,579.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="452" cy="579.0" r="6" fill="#d03a3a"/>
+<text x="436" y="584.0" text-anchor="end" fill="#22252d" font-size="14">Out-of-distribution for both models</text>
+<path d="M470.0,630 C430.0,630 490,613.0 462,613.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="452" cy="613.0" r="6" fill="#d03a3a"/>
+<text x="436" y="618.0" text-anchor="end" fill="#22252d" font-size="14">Fewer chars != fewer tokens</text>
+<path d="M470.0,630 C430.0,630 490,647.0 462,647.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="452" cy="647.0" r="6" fill="#d03a3a"/>
+<text x="436" y="652.0" text-anchor="end" fill="#22252d" font-size="14">Needs training data + prompt overhead</text>
+<path d="M470.0,630 C430.0,630 490,681.0 462,681.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="452" cy="681.0" r="6" fill="#1a9e5a"/>
+<text x="436" y="686.0" text-anchor="end" fill="#22252d" font-size="14">Use diffs, JSON, signatures, caching</text>
+<path d="M855,380 C900,380 885,130 860,130" stroke="#7a7f8c" stroke-width="2.5" fill="none"/>
+<rect x="860.0" y="110" width="170" height="40" rx="20" fill="#2b3a55"/>
+<text x="945" y="135" text-anchor="middle" fill="#fff" font-size="14" font-weight="600">4. Own reasoner</text>
+<path d="M1030.0,130 C1070.0,130 1010,79.0 1038,79.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="1048" cy="79.0" r="6" fill="#d03a3a"/>
+<text x="1064" y="84.0" text-anchor="start" fill="#22252d" font-size="14">Train from scratch: not realistic</text>
+<path d="M1030.0,130 C1070.0,130 1010,113.0 1038,113.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="1048" cy="113.0" r="6" fill="#d98a00"/>
+<text x="1064" y="118.0" text-anchor="start" fill="#22252d" font-size="14">Fine-tune + RL on tests: narrow gains</text>
+<path d="M1030.0,130 C1070.0,130 1010,147.0 1038,147.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="1048" cy="147.0" r="6" fill="#1a9e5a"/>
+<text x="1064" y="152.0" text-anchor="start" fill="#22252d" font-size="14">Build the control loop yourself</text>
+<path d="M1030.0,130 C1070.0,130 1010,181.0 1038,181.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="1048" cy="181.0" r="6" fill="#1a9e5a"/>
+<text x="1064" y="186.0" text-anchor="start" fill="#22252d" font-size="14">Plan, generate, run tests, repair, select</text>
+<path d="M855,380 C900,380 885,380 860,380" stroke="#7a7f8c" stroke-width="2.5" fill="none"/>
+<rect x="850.0" y="360" width="190" height="40" rx="20" fill="#2b3a55"/>
+<text x="945" y="385" text-anchor="middle" fill="#fff" font-size="14" font-weight="600">5. Strip-knowledge tiny coder</text>
+<path d="M1040.0,380 C1080.0,380 1010,329.0 1038,329.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="1048" cy="329.0" r="6" fill="#d03a3a"/>
+<text x="1064" y="334.0" text-anchor="start" fill="#22252d" font-size="14">Size is not spent on trivia</text>
+<path d="M1040.0,380 C1080.0,380 1010,363.0 1038,363.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="1048" cy="363.0" r="6" fill="#d03a3a"/>
+<text x="1064" y="368.0" text-anchor="start" fill="#22252d" font-size="14">Code needs world knowledge</text>
+<path d="M1040.0,380 C1080.0,380 1010,397.0 1038,397.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="1048" cy="397.0" r="6" fill="#d03a3a"/>
+<text x="1064" y="402.0" text-anchor="start" fill="#22252d" font-size="14">&quot;Codes without understanding&quot; is autocomplete</text>
+<path d="M1040.0,380 C1080.0,380 1010,431.0 1038,431.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="1048" cy="431.0" r="6" fill="#1a9e5a"/>
+<text x="1064" y="436.0" text-anchor="start" fill="#22252d" font-size="14">Small coders already exist (1.5B-32B)</text>
+<path d="M855,380 C900,380 885,630 860,630" stroke="#7a7f8c" stroke-width="2.5" fill="none"/>
+<rect x="860.0" y="610" width="170" height="40" rx="20" fill="#2b3a55"/>
+<text x="945" y="635" text-anchor="middle" fill="#fff" font-size="14" font-weight="600">6. Recommended path</text>
+<path d="M1030.0,630 C1070.0,630 1010,579.0 1038,579.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="1048" cy="579.0" r="6" fill="#1a9e5a"/>
+<text x="1064" y="584.0" text-anchor="start" fill="#22252d" font-size="14">Aider architect mode + local Qwen-Coder</text>
+<path d="M1030.0,630 C1070.0,630 1010,613.0 1038,613.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="1048" cy="613.0" r="6" fill="#1a9e5a"/>
+<text x="1064" y="618.0" text-anchor="start" fill="#22252d" font-size="14">Run 20 real tasks on 3B / 7B / 14B</text>
+<path d="M1030.0,630 C1070.0,630 1010,647.0 1038,647.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="1048" cy="647.0" r="6" fill="#1a9e5a"/>
+<text x="1064" y="652.0" text-anchor="start" fill="#22252d" font-size="14">Log pass rate and cost vs cloud-only</text>
+<path d="M1030.0,630 C1070.0,630 1010,681.0 1038,681.0" stroke="#c4c7cf" stroke-width="1.5" fill="none"/>
+<circle cx="1048" cy="681.0" r="6" fill="#d98a00"/>
+<text x="1064" y="686.0" text-anchor="start" fill="#22252d" font-size="14">Fine-tune only for a clear weakness</text>
+<ellipse cx="750" cy="380" rx="105" ry="52" fill="#e8f1ff" stroke="#2b3a55" stroke-width="2.5"/>
+<text x="750" y="374" text-anchor="middle" font-size="16" font-weight="700" fill="#2b3a55">Local coder +</text>
+<text x="750" y="394" text-anchor="middle" font-size="16" font-weight="700" fill="#2b3a55">LLM orchestrator</text>
+<circle cx="40" cy="732" r="6" fill="#1a9e5a"/><text x="54" y="737" font-size="13" fill="#22252d">Viable</text>
+<circle cx="210" cy="732" r="6" fill="#d98a00"/><text x="224" y="737" font-size="13" fill="#22252d">Partial / caveats</text>
+<circle cx="380" cy="732" r="6" fill="#d03a3a"/><text x="394" y="737" font-size="13" fill="#22252d">Doesn't work</text>
+</svg>
