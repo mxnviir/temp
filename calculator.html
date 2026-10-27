@@ -46,12 +46,12 @@
 <script>
 // Each subject: UT out of 35 (UT1, UT2); per SA term: theory + practical.
 // conv = [rawMax, convertedMax] converts raw theory to its scaled marks.
-// pracMax = practical max per SA (0 = none). theory SA max for math/English is editable.
+// pracMax = practical max per SA (0 = none)..
 const SUBJECTS = [
   { id:'phy',  name:'Physics',   theory:75, conv:70, prac:30 },
   { id:'chem', name:'Chemistry', theory:75, conv:70, prac:30 },
-  { id:'math', name:'Math',      theory:100, conv:100, prac:0, editable:true },
-  { id:'eng',  name:'English',   theory:100, conv:100, prac:0, editable:true },
+  { id:'math', name:'Math',      theory:85, conv:80, prac:20 },
+  { id:'eng',  name:'English',   theory:85, conv:80, prac:20 },
   { id:'ai',   name:'AI',        theory:55, conv:50, prac:50 },
 ];
 const UT_MAX = 35;
@@ -74,23 +74,11 @@ function build() {
     }
     h += field(`${s.id}-ut2`, 'UT 2', UT_MAX);
     h += '</div>';
-    if (s.editable)
-      h += `<div class="row">SA theory max marks: <input type="number" id="${s.id}-samax" value="${s.theory}" min="1" style="width:90px"></div>`;
-    else if (s.conv !== s.theory)
+    if (s.conv !== s.theory)
       h += `<div class="row">SA theory is converted: marks/${s.theory} &times; ${s.conv}</div>`;
     return h + '</div>';
   }).join('');
 
-  for (const s of SUBJECTS) {
-    if (!s.editable) continue;
-    $(`${s.id}-samax`).addEventListener('input', () => {
-      const m = Math.max(1, num(`${s.id}-samax`));
-      for (const t of [1, 2]) {
-        $(`${s.id}-sa${t}t-max`).textContent = m;
-        $(`${s.id}-sa${t}t`).max = m;
-      }
-    });
-  }
 }
 
 function check(id) {
@@ -102,16 +90,17 @@ function check(id) {
 
 const r2 = x => Math.round(x * 100) / 100;
 
+const W = { ut1:10, ut2:10, sa1:30, sa2:50 }; // weightage of final (%)
+
 function calcSubject(s) {
-  const theoryMax = s.editable ? Math.max(1, num(`${s.id}-samax`)) : s.theory;
-  const ut = num(`${s.id}-ut1`) + num(`${s.id}-ut2`);
-  let sa = 0;
-  for (const t of [1, 2]) {
-    sa += num(`${s.id}-sa${t}t`) / theoryMax * s.conv; // scale theory to converted max
-    if (s.prac) sa += num(`${s.id}-sa${t}p`);
-  }
-  const saMax = 2 * (s.conv + s.prac);
-  return { ut, utMax: 2 * UT_MAX, sa, saMax, total: ut + sa, max: 2 * UT_MAX + saMax };
+  const sa = t => (num(`${s.id}-sa${t}t`) / s.theory * s.conv + (s.prac ? num(`${s.id}-sa${t}p`) : 0)) / (s.conv + s.prac);
+  const p = {
+    ut1: num(`${s.id}-ut1`) / UT_MAX * W.ut1,
+    ut2: num(`${s.id}-ut2`) / UT_MAX * W.ut2,
+    sa1: sa(1) * W.sa1,
+    sa2: sa(2) * W.sa2,
+  };
+  return { ...p, total: p.ut1 + p.ut2 + p.sa1 + p.sa2 };
 }
 
 function calculate() {
@@ -119,25 +108,26 @@ function calculate() {
   document.querySelectorAll('#subjects input[type=number][max]').forEach(i => { if (i.id && check(i.id)) anyBad = true; });
   if (anyBad) { alert('Some marks are above the maximum or negative. Fix the red boxes.'); return; }
 
-  let gT = 0, gM = 0;
+  let gT = 0;
   const rows = SUBJECTS.map(s => {
-    const r = calcSubject(s); gT += r.total; gM += r.max;
-    return `<tr><td>${s.name}</td><td>${r2(r.ut)}/${r.utMax}</td><td>${r2(r.sa)}/${r.saMax}</td>
-      <td>${r2(r.total)}/${r.max}</td><td>${r2(r.total / r.max * 100)}%</td></tr>`;
+    const r = calcSubject(s); gT += r.total;
+    return `<tr><td>${s.name}</td><td>${r2(r.ut1)}/10</td><td>${r2(r.sa1)}/30</td><td>${r2(r.ut2)}/10</td>
+      <td>${r2(r.sa2)}/50</td><td><b>${r2(r.total)}/100</b></td></tr>`;
   }).join('');
 
-  const pct = gT / gM * 100;
+  const pct = gT / SUBJECTS.length;
   $('result').hidden = false;
   $('result').innerHTML = `<h2>Final Result</h2>
-    <table><tr><th>Subject</th><th>Unit Tests</th><th>SA 1 + SA 2</th><th>Total</th><th>%</th></tr>${rows}
-    <tr><td><b>Overall</b></td><td></td><td></td><td class="total">${r2(gT)}/${gM}</td><td class="total">${r2(pct)}%</td></tr></table>`;
+    <table><tr><th>Subject</th><th>UT 1</th><th>SA 1</th><th>UT 2</th><th>SA 2</th><th>Final</th></tr>${rows}
+    <tr><td><b>Overall</b></td><td></td><td></td><td></td><td></td><td class="total">${r2(pct)}%</td></tr></table>
+    <div class="row">Weightage: UT 1 = 10%, SA 1 = 30%, UT 2 = 10%, SA 2 = 50% of the final.</div>`;
   $('result').scrollIntoView({ behavior:'smooth' });
 }
 
 build();
 $('calc').addEventListener('click', calculate);
 $('reset').addEventListener('click', () => {
-  document.querySelectorAll('#subjects input').forEach(i => { if (!i.id.endsWith('-samax')) { i.value = ''; i.classList.remove('bad'); } });
+  document.querySelectorAll('#subjects input').forEach(i => { i.value = ''; i.classList.remove('bad'); });
   $('result').hidden = true;
 });
 </script>
