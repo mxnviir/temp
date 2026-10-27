@@ -112,14 +112,14 @@ function calculate() {
   const rows = SUBJECTS.map(s => {
     const r = calcSubject(s); gT += r.total;
     return `<tr><td>${s.name}</td><td>${r2(r.ut1)}/10</td><td>${r2(r.sa1)}/30</td><td>${r2(r.ut2)}/10</td>
-      <td>${r2(r.sa2)}/50</td><td><b>${r2(r.total)}/100</b></td></tr>`;
+      <td>${r2(r.sa2)}/50</td><td>${r2(r.total)}/100</td><td><b>${r2(r.total)}%</b></td></tr>`;
   }).join('');
 
   const pct = gT / SUBJECTS.length;
   $('result').hidden = false;
   $('result').innerHTML = `<h2>Final Result</h2>
-    <table><tr><th>Subject</th><th>UT 1</th><th>SA 1</th><th>UT 2</th><th>SA 2</th><th>Final</th></tr>${rows}
-    <tr><td><b>Overall</b></td><td></td><td></td><td></td><td></td><td class="total">${r2(pct)}%</td></tr></table>
+    <table><tr><th>Subject</th><th>UT 1</th><th>SA 1</th><th>UT 2</th><th>SA 2</th><th>Final</th><th>Percentage</th></tr>${rows}
+    <tr><td><b>Overall</b></td><td></td><td></td><td></td><td></td><td></td><td class="total">${r2(pct)}%</td></tr></table>
     <div class="row">Weightage: UT 1 = 10%, SA 1 = 30%, UT 2 = 10%, SA 2 = 50% of the final.</div>`;
   $('result').scrollIntoView({ behavior:'smooth' });
 }
