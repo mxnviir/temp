@@ -27,6 +27,7 @@
   #result th, #result td { text-align:left; padding:8px 4px; border-bottom:1px solid var(--line); }
   #result td:not(:first-child), #result th:not(:first-child) { text-align:right; }
   .total { font-size:1.4rem; font-weight:700; color:var(--accent); }
+  .pct { color:var(--accent); font-size:1.1rem; }
   button { padding:10px 18px; border:0; border-radius:8px; background:var(--accent); color:#fff; font-size:1rem; cursor:pointer; }
   button.alt { background:transparent; color:var(--text); border:1px solid var(--line); margin-left:8px; }
 </style>
@@ -76,9 +77,17 @@ function build() {
     h += '</div>';
     if (s.conv !== s.theory)
       h += `<div class="row">SA theory is converted: marks/${s.theory} &times; ${s.conv}</div>`;
-    return h + '</div>';
+    return h + `<div class="row live" id="${s.id}-live"></div></div>`;
   }).join('');
 
+}
+
+function updateLive(s) {
+  const ids = [...document.querySelectorAll(`#subjects input[id^="${s.id}-"]`)].map(i => i.id);
+  const out = $(`${s.id}-live`);
+  const filled = ids.every(id => $(id).value !== '');
+  if (!filled || ids.some(check)) { out.innerHTML = ''; return; }
+  out.innerHTML = `${s.name} percentage: <b class="pct">${r2(calcSubject(s).total)}%</b>`;
 }
 
 function check(id) {
@@ -125,9 +134,12 @@ function calculate() {
 }
 
 build();
+SUBJECTS.forEach(s => document.querySelectorAll(`#subjects input[id^="${s.id}-"]`)
+  .forEach(i => i.addEventListener('input', () => updateLive(s))));
 $('calc').addEventListener('click', calculate);
 $('reset').addEventListener('click', () => {
   document.querySelectorAll('#subjects input').forEach(i => { i.value = ''; i.classList.remove('bad'); });
+  document.querySelectorAll('.live').forEach(d => d.innerHTML = '');
   $('result').hidden = true;
 });
 </script>
