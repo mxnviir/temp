@@ -1,0 +1,747 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shadow Trail</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a square night-time transit map beside a dispatch panel; the panel drops below the map on phones */
+:root{
+  --ink:#0a0f1a; --ground:#0e1625; --block:#142136; --park:#11302b; --panel:#121c2d; --raise:#18243a; --line:#26344d;
+  --text:#e9eef7; --muted:#8c9bb4; --node:#1a2740; --node-edge:#3d4e6e;
+  --cab:#f3b53f; --tram:#33c7a0; --metro:#ff5d6c; --smoke:#a98cff; --river:#15345a; --river-edge:#1d4673;
+  --f-display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+[hidden]{display:none!important}
+body{background:var(--ink);color:var(--text);font-family:var(--f-body);font-size:15px;line-height:1.45}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--smoke);outline-offset:2px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+#app{min-height:100%;display:flex;flex-direction:column}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-block:10px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:10px;min-width:0}
+.brand b{font-family:var(--f-display);font-weight:900;font-size:28px;letter-spacing:.06em;text-transform:uppercase;line-height:1}
+.brand span{color:var(--muted);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+.top-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.status{font-family:var(--f-mono);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.status b{color:var(--text)}
+.ghost-btn{background:transparent;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;color:var(--muted)}
+.ghost-btn:hover{color:var(--text);border-color:var(--node-edge)}
+@media (max-width:600px){.brand span{display:none}.brand b{font-size:24px}.top{row-gap:6px}.top-right{flex:1 1 100%;justify-content:space-between}.status{margin-right:auto}}
+
+.game{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:18px;padding-block:16px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+@media (max-width:860px){.game{grid-template-columns:minmax(0,1fr);gap:14px}}
+.board{position:relative;min-width:0;display:flex;flex-direction:column;gap:8px}
+.board-scroll{overflow:auto;border:1px solid var(--line);border-radius:14px;background:var(--ground);-webkit-overflow-scrolling:touch}
+#map{display:block;margin:0 auto;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.zoom{position:absolute;top:10px;right:10px;display:flex;gap:6px;z-index:2}
+.zoom button{width:36px;height:36px;border-radius:9px;border:1px solid var(--line);background:rgba(18,28,45,.92);font-size:20px;line-height:1}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:22px;height:4px;border-radius:2px;vertical-align:middle;margin-right:6px}
+
+/* SVG map */
+.blk{fill:var(--block)} .blk.park{fill:var(--park)}
+.river{fill:none;stroke:var(--river);stroke-width:58;stroke-linecap:round}
+.river-edge{fill:none;stroke:var(--river-edge);stroke-width:64;stroke-linecap:round}
+.river-name{font-family:var(--f-mono);font-size:15px;letter-spacing:.5em;fill:#4f7fb3}
+.e{fill:none;stroke-linecap:round}
+.e-cab{stroke:var(--cab);stroke-width:3.5;opacity:.62}
+.e-casing{stroke:var(--node-edge);stroke-width:15}
+.e-tram{stroke:var(--tram);stroke-width:5;opacity:.85}
+.e-metro{stroke:var(--metro);stroke-width:6;opacity:.85}
+.e-ferry{stroke:var(--smoke);stroke-width:4;stroke-dasharray:10 9;opacity:.9}
+.n-core{fill:var(--node);stroke:var(--node-edge);stroke-width:3}
+.n-core.tram{stroke:var(--tram);stroke-width:4}
+.n-metro{fill:none;stroke:var(--metro);stroke-width:4}
+.n-pier{fill:none;stroke:var(--smoke);stroke-width:3;stroke-dasharray:5 4}
+.n-label{font-family:var(--f-mono);font-weight:600;font-size:19px;fill:var(--text);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.suspect{fill:var(--smoke);fill-opacity:.22;stroke:var(--smoke);stroke-opacity:.55;stroke-width:2}
+.dest{fill:#fff;fill-opacity:.07;stroke:#fff;stroke-width:3;stroke-dasharray:7 6;animation:spin 6s linear infinite;transform-box:fill-box;transform-origin:center}
+.dest.picked{stroke:var(--smoke);stroke-width:5;stroke-dasharray:none;fill:var(--smoke);fill-opacity:.25;animation:none}
+.cur-ring{fill:none;stroke-width:4;animation:pulse 1.4s ease-in-out infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{50%{stroke-opacity:.25}}
+.tok-label{font-family:var(--f-mono);font-weight:600;font-size:18px;fill:var(--ink);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.seen-ring{fill:none;stroke:var(--smoke);stroke-width:3;stroke-dasharray:4 5}
+.seen-tag{fill:var(--smoke)}
+.seen-text{font-family:var(--f-mono);font-size:14px;font-weight:600;fill:var(--ink);text-anchor:middle;dominant-baseline:central}
+.route{fill:none;stroke:var(--smoke);stroke-width:7;stroke-linejoin:round;stroke-linecap:round;opacity:.75}
+.route-dot{fill:var(--smoke)}
+.route-num{font-family:var(--f-mono);font-size:13px;font-weight:600;fill:var(--text)}
+.hit{fill:transparent;cursor:pointer}
+@media (prefers-reduced-motion:reduce){.dest,.cur-ring{animation:none}}
+
+/* Panel */
+.panel{display:flex;flex-direction:column;gap:14px;min-width:0;align-self:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.turn-head h2{font-family:var(--f-display);font-weight:900;font-size:34px;line-height:1;letter-spacing:.03em;text-transform:uppercase;margin:2px 0 4px;text-wrap:balance;display:flex;align-items:center;gap:10px}
+.turn-head p{margin:0;color:var(--muted)}
+.turn-head p b{color:var(--text)}
+.dot{width:16px;height:16px;border-radius:50%;flex:none;border:2px solid var(--ink);box-shadow:0 0 0 2px currentColor}
+.diamond{width:16px;height:16px;flex:none;background:var(--smoke);transform:rotate(45deg);border-radius:2px}
+.alert{border-radius:10px;padding:10px 12px;font-size:14px;background:rgba(169,140,255,.14);border:1px solid rgba(169,140,255,.45)}
+.alert.hot{background:rgba(255,93,108,.13);border-color:rgba(255,93,108,.5)}
+.alert b{font-family:var(--f-mono)}
+.wallet{display:flex;flex-wrap:wrap;gap:6px}
+.tk{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px 3px 4px;font-size:12px;background:var(--raise);border:1px solid var(--line)}
+.tk b{font-family:var(--f-mono);min-width:22px;height:22px;border-radius:999px;display:inline-grid;place-items:center;color:var(--ink);font-size:12px}
+.tk.zero{opacity:.4}
+.cab b,.tbtn.cab{background:var(--cab)} .tram b,.tbtn.tram{background:var(--tram)} .metro b,.tbtn.metro{background:var(--metro)} .smoke b,.tbtn.smoke{background:var(--smoke)} .sprint b{background:var(--text)}
+.moves{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow:auto;padding-right:2px}
+.mrow{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:10px;background:var(--raise);border:1px solid transparent}
+.mrow.picked{border-color:var(--smoke);background:rgba(169,140,255,.12)}
+.node-chip{font-family:var(--f-mono);font-weight:600;font-size:16px;min-width:40px;text-align:center;padding:4px 0;border-radius:8px;background:var(--node);border:1px solid var(--node-edge)}
+.mrow .tix{display:flex;flex-wrap:wrap;gap:6px}
+.tbtn{border:0;border-radius:8px;padding:7px 12px;font-weight:600;font-size:13px;color:var(--ink);min-height:34px}
+.tbtn:hover{filter:brightness(1.12)}
+.pickbox{display:flex;flex-direction:column;gap:8px}
+.pickbox .tix{display:flex;gap:8px;flex-wrap:wrap}
+.pickbox .tbtn{padding:10px 16px;font-size:15px;min-height:42px}
+.hint{color:var(--muted);font-size:13px;margin:0}
+.primary{border:0;border-radius:10px;padding:12px 16px;font-weight:600;background:var(--text);color:var(--ink);font-size:15px}
+.primary:hover{filter:brightness(.92)}
+.secondary{border:1px solid var(--line);border-radius:10px;padding:11px 16px;font-weight:600;background:var(--raise)}
+.toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:10px;background:var(--raise);border:1px solid var(--line);text-align:left;width:100%}
+.toggle[aria-pressed="true"]{border-color:var(--smoke);background:rgba(169,140,255,.14)}
+.toggle .sw{width:36px;height:20px;border-radius:999px;background:var(--line);position:relative;flex:none}
+.toggle .sw::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:var(--muted);transition:transform .15s}
+.toggle[aria-pressed="true"] .sw{background:var(--smoke)}
+.toggle[aria-pressed="true"] .sw::after{transform:translateX(16px);background:var(--ink)}
+.roster{display:flex;flex-direction:column;gap:6px}
+.ag{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;font-size:13px}
+.ag .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ag .nm.on{font-weight:600}
+.ag .at{font-family:var(--f-mono);color:var(--muted)}
+.ag .mini{font-family:var(--f-mono);font-size:12px;color:var(--muted);display:flex;gap:8px}
+.ag .mini span::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;background:currentColor}
+.c-cab{color:var(--cab)} .c-tram{color:var(--tram)} .c-metro{color:var(--metro)}
+.tlog{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));gap:4px}
+.slot{border-radius:6px;background:var(--raise);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:46px;padding:2px 0;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.slot .n{font-size:9px;color:var(--muted)}
+.slot .v{font-size:10px;font-weight:600}
+.slot .p{font-size:11px;font-weight:600}
+.slot.reveal{border-color:var(--smoke);border-width:2px}
+.slot.t-cab{background:var(--cab);color:var(--ink)} .slot.t-tram{background:var(--tram);color:var(--ink)} .slot.t-metro{background:var(--metro);color:var(--ink)} .slot.t-smoke{background:var(--ink);color:var(--smoke);border-color:var(--smoke)}
+.slot[class*="t-"] .n{color:inherit;opacity:.7}
+.slot.t-smoke.reveal{box-shadow:inset 0 0 0 1px var(--smoke)}
+.result h2{font-family:var(--f-display);font-weight:900;font-size:44px;line-height:.95;text-transform:uppercase;letter-spacing:.03em;margin:4px 0;text-wrap:balance}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.stat{background:var(--raise);border-radius:10px;padding:8px 10px}
+.stat b{display:block;font-family:var(--f-mono);font-size:20px}
+.stat span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+
+/* Overlays */
+.overlay{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;overflow:auto;
+  padding-block:calc(env(safe-area-inset-top,0px) + 20px) calc(env(safe-area-inset-bottom,0px) + 20px);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.overlay.dim{background:rgba(6,10,18,.78);backdrop-filter:blur(3px)}
+.overlay.solid{background:var(--ink)}
+.sheet{width:100%;max-width:520px;margin:auto;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px;display:flex;flex-direction:column;gap:16px}
+.sheet h1{font-family:var(--f-display);font-weight:900;font-size:52px;line-height:.9;letter-spacing:.04em;text-transform:uppercase;margin:0}
+.sheet h3{font-family:var(--f-display);font-weight:700;font-size:22px;letter-spacing:.04em;text-transform:uppercase;margin:0}
+.sheet p{margin:0;color:var(--muted)}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label,.field .lbl{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.field input[type=text]{background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
+.seg{display:flex;gap:6px}
+.seg button{flex:1;padding:9px 0;border-radius:10px;border:1px solid var(--line);background:var(--raise);font-family:var(--f-mono);font-weight:600}
+.seg button[aria-pressed="true"]{background:var(--text);color:var(--ink);border-color:var(--text)}
+.agent-names{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.agent-names .an{display:flex;align-items:center;gap:8px}
+.agent-names .an .dot{width:12px;height:12px}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+.actions>*{flex:1 1 160px}
+.rules{font-size:14px;color:var(--muted)}
+.rules summary{cursor:pointer;color:var(--text);font-weight:600}
+.rules ul{margin:10px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+.rules b{color:var(--text)}
+.cover{max-width:460px;text-align:center;align-items:center;gap:18px;padding:32px 24px}
+.cover .big{width:72px;height:72px}
+.cover .big.diamond{transform:rotate(45deg) scale(.75);border-radius:8px}
+.cover h1{font-size:46px}
+.cover .primary{width:100%;padding:16px;font-size:16px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div class="brand"><b>Shadow Trail</b><span>Port Veyra · after midnight</span></div>
+    <div class="top-right">
+      <div class="status" id="status"></div>
+      <button class="ghost-btn" data-act="rules" type="button">Rules</button>
+      <button class="ghost-btn" data-act="quit" type="button" id="quitBtn">New game</button>
+    </div>
+  </header>
+  <main class="game">
+    <section class="board">
+      <div class="board-scroll" id="boardScroll"><svg id="map" viewBox="0 0 1000 1000" role="img" aria-label="Map of Port Veyra"></svg></div>
+      <div class="zoom"><button type="button" data-act="zoom-out" aria-label="Zoom out">−</button><button type="button" data-act="zoom-in" aria-label="Zoom in">+</button></div>
+      <div class="legend">
+        <span><i style="background:var(--cab)"></i>Cab · street to next crossing</span>
+        <span><i style="background:var(--tram)"></i>Tram · teal-ringed stops</span>
+        <span><i style="background:var(--metro)"></i>Metro · red-ringed stations</span>
+        <span><i style="background:repeating-linear-gradient(90deg,var(--smoke) 0 6px,transparent 6px 10px)"></i>Ferry · Smoke tickets only</span>
+      </div>
+    </section>
+    <aside class="panel" id="panel"></aside>
+  </main>
+</div>
+
+<div class="overlay dim" id="setup" hidden></div>
+<div class="overlay solid" id="cover" hidden></div>
+<div class="overlay dim" id="modal" hidden></div>
+
+<script>
+(function(){
+'use strict';
+const $ = s => document.querySelector(s);
+const NS = 'http://www.w3.org/2000/svg';
+const COLS = 8, ROWS = 8, BRIDGES = [1, 4, 6];
+const MOVES_TOTAL = 22, REVEALS = [3, 8, 13, 18, 22];
+const T_ORDER = ['cab', 'tram', 'metro', 'smoke'];
+const T_LABEL = {cab:'Cab', tram:'Tram', metro:'Metro', smoke:'Smoke', ferry:'Ferry', sprint:'Sprint'};
+const T_SHORT = {cab:'CAB', tram:'TRM', metro:'MET', smoke:'SMK'};
+const AGENT_COLORS = ['#5cb8ff', '#ff7ac0', '#b4e468', '#e8edf6'];
+const AGENT_DEFAULTS = ['Harrow', 'Quill', 'Marlow', 'Vance'];
+const SAVE_KEY = 'shadow-trail-v1';
+const nid = (r, c) => r * COLS + c + 1;
+
+function rng(seed){ return () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const riverY = x => 500 + 16 * Math.sin(x / 140 + 0.8);
+
+/* ---------- The city: fixed layout, same every game ---------- */
+function buildCity(){
+  const rnd = rng(7319);
+  const nodes = [];
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++){
+    let x = 80 + c * 120 + (rnd() - .5) * 56;
+    let y = 80 + r * 120 + (rnd() - .5) * 46;
+    if (r === 3) y = 434 - rnd() * 24;
+    if (r === 4) y = 566 + rnd() * 24;
+    nodes[nid(r, c)] = {id:nid(r, c), r, c, x:Math.round(x), y:Math.round(y)};
+  }
+  const cab = [], diagCells = new Set();
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++){
+    if (c < COLS - 1) cab.push({a:nid(r, c), b:nid(r, c + 1), t:'cab', ortho:true});
+    if (r < ROWS - 1 && (r !== 3 || BRIDGES.includes(c))) cab.push({a:nid(r, c), b:nid(r + 1, c), t:'cab', ortho:true, bridge:r === 3});
+  }
+  for (let r = 0; r < ROWS - 1; r++) for (let c = 0; c < COLS - 1; c++){
+    if (r === 3) continue;
+    if (rnd() < 0.3){
+      diagCells.add(r + ',' + c);
+      if (rnd() < .5) cab.push({a:nid(r, c), b:nid(r + 1, c + 1), t:'cab'});
+      else cab.push({a:nid(r, c + 1), b:nid(r + 1, c), t:'cab'});
+    }
+  }
+  const alive = new Set(cab);
+  const deg = n => { let d = 0; alive.forEach(e => { if (e.a === n || e.b === n) d++; }); return d; };
+  const connected = () => {
+    const adj = {}; alive.forEach(e => { (adj[e.a] = adj[e.a] || []).push(e.b); (adj[e.b] = adj[e.b] || []).push(e.a); });
+    const seen = new Set([1]), q = [1];
+    while (q.length){ const n = q.pop(); for (const m of adj[n] || []) if (!seen.has(m)){ seen.add(m); q.push(m); } }
+    return seen.size === ROWS * COLS;
+  };
+  const order = cab.filter(e => e.ortho && !e.bridge).map(e => [rnd(), e]).sort((p, q) => p[0] - q[0]).map(p => p[1]);
+  let removed = 0;
+  for (const e of order){
+    if (removed >= 18) break;
+    if (deg(e.a) <= 2 || deg(e.b) <= 2) continue;
+    alive.delete(e);
+    if (connected()) removed++; else alive.add(e);
+  }
+  const edges = [...alive];
+  const P = (r, c) => nid(r, c);
+  const route = (pts, t) => { for (let i = 1; i < pts.length; i++) edges.push({a:P(...pts[i - 1]), b:P(...pts[i]), t}); };
+  // Tram lines
+  route([[2,0],[1,1],[1,3],[0,4],[1,5],[2,6],[1,7]], 'tram');
+  route([[3,1],[3,3],[3,5],[3,7]], 'tram');
+  route([[4,0],[4,2],[4,4],[5,6],[4,7]], 'tram');
+  route([[5,0],[6,1],[6,3],[7,4],[6,6]], 'tram');
+  route([[0,0],[2,0],[4,0],[6,1]], 'tram');
+  route([[1,3],[3,3],[4,2],[6,3]], 'tram');
+  route([[1,5],[3,5],[4,4],[6,5],[7,7]], 'tram');
+  route([[1,7],[3,7],[5,7],[6,6]], 'tram');
+  // Metro
+  [[[1,1],[3,3]],[[3,3],[4,4]],[[4,4],[5,6]],[[2,6],[4,4]],[[4,4],[6,1]],[[0,4],[3,3]],[[0,4],[1,1]],[[0,4],[2,6]],
+   [[4,0],[1,1]],[[4,0],[6,1]],[[6,1],[7,4]],[[7,4],[5,6]],[[5,6],[3,7]],[[3,7],[2,6]]].forEach(([a, b]) => edges.push({a:P(...a), b:P(...b), t:'metro'}));
+  // Ferry along the river
+  route([[3,0],[4,2],[3,5],[4,7]], 'ferry');
+
+  const adj = {}, kinds = {};
+  for (const n of nodes) if (n){ adj[n.id] = []; kinds[n.id] = new Set(); }
+  for (const e of edges){
+    adj[e.a].push({to:e.b, t:e.t}); adj[e.b].push({to:e.a, t:e.t});
+    kinds[e.a].add(e.t); kinds[e.b].add(e.t);
+  }
+  return {nodes, edges, adj, kinds, diagCells};
+}
+const CITY = buildCity();
+const START_POOL = [[0,1],[0,6],[1,3],[2,0],[2,5],[2,7],[3,2],[4,1],[4,5],[5,3],[5,7],[6,0],[6,4],[7,2],[7,6],[1,5]].map(p => nid(...p));
+
+/* ---------- State ---------- */
+let state = null;          // the game
+let screen = 'setup';      // 'setup' | 'game'
+let zoom = 1;
+let showSuspects = true;
+let setupCfg = {shadowName:'Shadow', count:3, names:AGENT_DEFAULTS.slice(), tracker:true};
+
+function save(){ try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {} }
+function load(){ try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && s.v === 1) return s; } catch (e) {} return null; }
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+
+function newGame(cfg){
+  const pool = shuffle(START_POOL.slice());
+  const agents = cfg.names.slice(0, cfg.count).map((name, i) => ({
+    name:(name || '').trim() || AGENT_DEFAULTS[i], color:AGENT_COLORS[i], pos:pool[i + 1], tickets:{cab:10, tram:8, metro:4}
+  }));
+  state = {
+    v:1, shadowName:(cfg.shadowName || '').trim() || 'Shadow', agents,
+    shadow:{pos:pool[0], tickets:{cab:4, tram:3, metro:3, smoke:agents.length + 1, sprint:2}},
+    shadowStart:pool[0], log:[], phase:'shadow', view:'cover-shadow', turnAgent:0,
+    sprint:{active:false, step:0}, shadowDone:false, turnMoves:[], tracker:cfg.tracker,
+    suspects:START_POOL.filter(n => !agents.some(a => a.pos === n)), lastReveal:null, spottedFresh:false,
+    roundMoved:false, selected:null, winner:null, reason:'', trails:agents.map(a => [a.pos])
+  };
+  screen = 'game';
+  save(); render();
+}
+
+function shadowOptions(){
+  const blocked = new Set(state.agents.map(a => a.pos)), T = state.shadow.tickets, m = new Map();
+  for (const {to, t} of CITY.adj[state.shadow.pos]){
+    if (blocked.has(to)) continue;
+    const s = m.get(to) || new Set();
+    if (t !== 'ferry' && T[t] > 0) s.add(t);
+    if (T.smoke > 0) s.add('smoke');
+    if (s.size) m.set(to, s);
+  }
+  return m;
+}
+function agentOptions(i){
+  const a = state.agents[i], m = new Map();
+  const blocked = new Set(state.agents.filter((_, j) => j !== i).map(x => x.pos));
+  for (const {to, t} of CITY.adj[a.pos]){
+    if (blocked.has(to) || t === 'ferry' || !(a.tickets[t] > 0)) continue;
+    const s = m.get(to) || new Set(); s.add(t); m.set(to, s);
+  }
+  return m;
+}
+function currentOptions(){
+  if (state.view === 'shadow' && !state.shadowDone) return shadowOptions();
+  if (state.view === 'agents') return agentOptions(state.turnAgent);
+  return new Map();
+}
+
+function updateSuspects(ticket, revealed){
+  if (revealed != null){ state.suspects = [revealed]; return; }
+  const blocked = new Set(state.agents.map(a => a.pos)), out = new Set();
+  for (const n of state.suspects) for (const {to, t} of CITY.adj[n]){
+    if (blocked.has(to)) continue;
+    if (ticket === 'smoke' || t === ticket) out.add(to);
+  }
+  state.suspects = [...out];
+}
+
+function doShadowMove(to, ticket){
+  const moveNo = state.log.length + 1, reveal = REVEALS.includes(moveNo);
+  if (state.sprint.active && state.sprint.step === 1) state.shadow.tickets.sprint--;
+  state.shadow.tickets[ticket]--;
+  state.shadow.pos = to;
+  state.log.push({ticket, node:to, reveal});
+  state.turnMoves.push({ticket, node:to, reveal, move:moveNo});
+  updateSuspects(ticket, reveal ? to : null);
+  if (reveal){ state.lastReveal = {node:to, move:moveNo}; state.spottedFresh = true; }
+  state.selected = null;
+  if (state.sprint.active && state.sprint.step === 1 && state.log.length < MOVES_TOTAL && shadowOptions().size){
+    state.sprint.step = 2;
+  } else {
+    state.sprint = {active:false, step:0};
+    state.shadowDone = true;
+  }
+  save(); render();
+}
+
+function doAgentMove(to, ticket){
+  const i = state.turnAgent, a = state.agents[i];
+  a.tickets[ticket]--; state.shadow.tickets[ticket]++;
+  a.pos = to; state.trails[i].push(to); state.roundMoved = true; state.selected = null;
+  if (to === state.shadow.pos){ endGame('agents', `${a.name} walked into crossing ${to} and caught the Shadow.`); return; }
+  state.suspects = state.suspects.filter(n => n !== to);
+  nextAgent();
+}
+function nextAgent(){
+  state.turnAgent++;
+  state.selected = null;
+  if (state.turnAgent >= state.agents.length) endRound();
+  else { save(); render(); centerOn(state.agents[state.turnAgent].pos); }
+}
+function endRound(){
+  if (!state.roundMoved) return endGame('shadow', 'None of the agents could make a move, so the Shadow slipped away.');
+  if (state.log.length >= MOVES_TOTAL) return endGame('shadow', `The Shadow stayed loose for all ${MOVES_TOTAL} moves.`);
+  if (shadowOptions().size === 0) return endGame('agents', `The Shadow is cornered at ${state.shadow.pos} with nowhere left to go.`);
+  state.phase = 'shadow'; state.view = 'cover-shadow';
+  state.shadowDone = false; state.turnMoves = []; state.spottedFresh = false; state.roundMoved = false; state.turnAgent = 0;
+  save(); render();
+}
+function endGame(winner, reason){
+  state.phase = 'over'; state.view = 'end'; state.winner = winner; state.reason = reason; state.selected = null;
+  save(); render();
+}
+
+/* ---------- Map drawing ---------- */
+const svg = $('#map');
+function mk(tag, attrs, parent){ const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function edgePath(a, b, off){
+  const A = CITY.nodes[a], B = CITY.nodes[b];
+  if (!off) return `M${A.x} ${A.y}L${B.x} ${B.y}`;
+  const dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy);
+  const cx = (A.x + B.x) / 2 - dy / L * off, cy = (A.y + B.y) / 2 + dx / L * off;
+  return `M${A.x} ${A.y}Q${cx.toFixed(1)} ${cy.toFixed(1)} ${B.x} ${B.y}`;
+}
+const L = {};
+function drawStatic(){
+  const rnd = rng(99);
+  const g = mk('g', {}, svg);
+  mk('rect', {x:0, y:0, width:1000, height:1000, fill:'var(--ground)'}, g);
+  for (let r = 0; r < ROWS - 1; r++) for (let c = 0; c < COLS - 1; c++){
+    if (r === 3 || CITY.diagCells.has(r + ',' + c)) continue;
+    const q = [CITY.nodes[nid(r, c)], CITY.nodes[nid(r, c + 1)], CITY.nodes[nid(r + 1, c + 1)], CITY.nodes[nid(r + 1, c)]];
+    const mx = q.reduce((s, p) => s + p.x, 0) / 4, my = q.reduce((s, p) => s + p.y, 0) / 4;
+    const pts = q.map(p => `${(mx + (p.x - mx) * .62).toFixed(1)},${(my + (p.y - my) * .62).toFixed(1)}`).join(' ');
+    mk('polygon', {points:pts, class:'blk' + (rnd() < .14 ? ' park' : ''), rx:8}, g);
+  }
+  let d = '';
+  for (let x = -40; x <= 1040; x += 20) d += (x === -40 ? 'M' : 'L') + x + ' ' + riverY(x).toFixed(1);
+  mk('path', {d, class:'river-edge', id:'riverPath'}, g);
+  mk('path', {d, class:'river'}, g);
+  const label = mk('text', {class:'river-name', dy:5}, g);
+  const tp = mk('textPath', {href:'#riverPath', startOffset:'30%'}, label); tp.textContent = 'RIVER VEYL';
+
+  const eg = mk('g', {}, svg);
+  for (const e of CITY.edges) if (e.t === 'cab' && e.a + COLS === e.b && CITY.nodes[e.a].r === 3) mk('path', {d:edgePath(e.a, e.b), class:'e e-casing'}, eg);
+  for (const e of CITY.edges) if (e.t === 'cab') mk('path', {d:edgePath(e.a, e.b), class:'e e-cab'}, eg);
+  for (const e of CITY.edges) if (e.t === 'tram') mk('path', {d:edgePath(e.a, e.b, 16), class:'e e-tram'}, eg);
+  for (const e of CITY.edges) if (e.t === 'metro') mk('path', {d:edgePath(e.a, e.b, -26), class:'e e-metro'}, eg);
+  for (const e of CITY.edges) if (e.t === 'ferry'){
+    const A = CITY.nodes[e.a], B = CITY.nodes[e.b], mx = (A.x + B.x) / 2;
+    mk('path', {d:`M${A.x} ${A.y}Q${mx} ${riverY(mx).toFixed(1)} ${B.x} ${B.y}`, class:'e e-ferry'}, eg);
+  }
+  L.suspects = mk('g', {}, svg);
+  const ng = mk('g', {}, svg);
+  for (const n of CITY.nodes){
+    if (!n) continue;
+    const k = CITY.kinds[n.id];
+    if (k.has('ferry')) mk('circle', {cx:n.x, cy:n.y, r:k.has('metro') ? 32 : 26, class:'n-pier'}, ng);
+    if (k.has('metro')) mk('circle', {cx:n.x, cy:n.y, r:25, class:'n-metro'}, ng);
+    mk('circle', {cx:n.x, cy:n.y, r:19, class:'n-core' + (k.has('tram') ? ' tram' : '')}, ng);
+    mk('text', {x:n.x, y:n.y + 1, class:'n-label'}, ng).textContent = n.id;
+  }
+  L.route = mk('g', {}, svg);
+  L.hl = mk('g', {}, svg);
+  L.tokens = mk('g', {}, svg);
+  L.hit = mk('g', {}, svg);
+  for (const n of CITY.nodes){
+    if (!n) continue;
+    const h = mk('circle', {cx:n.x, cy:n.y, r:36, class:'hit', 'data-node':n.id}, L.hit);
+    h.addEventListener('click', () => onNodeTap(n.id));
+  }
+}
+
+function renderBoard(){
+  for (const k of ['suspects', 'route', 'hl', 'tokens']) L[k].replaceChildren();
+  if (screen !== 'game' || !state || state.view.startsWith('cover')) return;
+  const v = state.view, N = id => CITY.nodes[id];
+  const trackerOn = state.tracker && showSuspects && (v === 'agents' || v === 'shadow');
+  if (trackerOn) for (const id of state.suspects) mk('circle', {cx:N(id).x, cy:N(id).y, r:28, class:'suspect'}, L.suspects);
+
+  if (v === 'end'){
+    const path = [state.shadowStart, ...state.log.map(e => e.node)];
+    mk('polyline', {points:path.map(id => `${N(id).x},${N(id).y}`).join(' '), class:'route'}, L.route);
+    state.log.forEach((e, i) => {
+      const n = N(e.node);
+      mk('circle', {cx:n.x + 24, cy:n.y - 24, r:11, class:'route-dot'}, L.route);
+      mk('text', {x:n.x + 24, y:n.y - 23, class:'tok-label', style:'font-size:12px'}, L.route).textContent = i + 1;
+    });
+  }
+  if (v === 'agents' && state.lastReveal){
+    const n = N(state.lastReveal.node);
+    mk('circle', {cx:n.x, cy:n.y, r:33, class:'seen-ring'}, L.hl);
+    mk('rect', {x:n.x - 38, y:n.y - 62, width:76, height:22, rx:6, class:'seen-tag'}, L.hl);
+    mk('text', {x:n.x, y:n.y - 51, class:'seen-text'}, L.hl).textContent = 'SEEN · ' + state.lastReveal.move;
+  }
+  const opts = currentOptions();
+  for (const id of opts.keys()) mk('circle', {cx:N(id).x, cy:N(id).y, r:29, class:'dest' + (state.selected === id ? ' picked' : '')}, L.hl);
+
+  state.agents.forEach((a, i) => {
+    const n = N(a.pos);
+    if (v === 'agents' && i === state.turnAgent) mk('circle', {cx:n.x, cy:n.y, r:31, class:'cur-ring', stroke:a.color}, L.tokens);
+    mk('circle', {cx:n.x, cy:n.y, r:22, fill:a.color, stroke:'#0a0f1a', 'stroke-width':4}, L.tokens);
+    mk('text', {x:n.x, y:n.y + 1, class:'tok-label'}, L.tokens).textContent = a.pos;
+  });
+  if (v === 'shadow' || v === 'end'){
+    const n = N(state.shadow.pos);
+    const caught = state.agents.some(a => a.pos === state.shadow.pos);
+    const x = caught ? n.x + 26 : n.x, y = caught ? n.y + 26 : n.y;
+    mk('rect', {x:x - 17, y:y - 17, width:34, height:34, rx:4, transform:`rotate(45 ${x} ${y})`, fill:'var(--smoke)', stroke:'#fff', 'stroke-width':3}, L.tokens);
+    mk('text', {x, y:y + 1, class:'tok-label'}, L.tokens).textContent = state.shadow.pos;
+  }
+}
+
+function onNodeTap(id){
+  if (!state || screen !== 'game') return;
+  const opts = currentOptions();
+  state.selected = opts.has(id) ? id : null;
+  render();
+}
+
+/* ---------- Panel ---------- */
+const wallet = (T, keys) => `<div class="wallet">${keys.map(k => `<span class="tk ${k}${T[k] ? '' : ' zero'}"><b>${T[k]}</b>${T_LABEL[k]}</span>`).join('')}</div>`;
+const tixButtons = (to, set) => T_ORDER.filter(t => set.has(t)).map(t => `<button type="button" class="tbtn ${t}" data-act="move" data-to="${to}" data-t="${t}">${T_LABEL[t]}</button>`).join('');
+function moveList(opts){
+  const ids = [...opts.keys()].sort((a, b) => a - b);
+  return `<div class="moves">${ids.map(id => `<div class="mrow${state.selected === id ? ' picked' : ''}" data-row="${id}"><span class="node-chip">${id}</span><div class="tix">${tixButtons(id, opts.get(id))}</div></div>`).join('')}</div>`;
+}
+function pickBox(opts){
+  if (state.selected && opts.has(state.selected))
+    return `<div class="pickbox"><span class="eyebrow">Go to ${state.selected} by</span><div class="tix">${tixButtons(state.selected, opts.get(state.selected))}</div></div>`;
+  return `<p class="hint">Tap a crossing with a dashed ring on the map, or pick a ticket from the list.</p>`;
+}
+function logGrid(showAll){
+  let h = '<div class="tlog">';
+  for (let i = 1; i <= MOVES_TOTAL; i++){
+    const e = state.log[i - 1], rv = REVEALS.includes(i);
+    const node = e && (showAll || e.reveal) ? `<span class="p">${e.node}</span>` : '';
+    h += `<div class="slot${e ? ' t-' + e.ticket : ''}${rv ? ' reveal' : ''}" title="Move ${i}${rv ? ' (sighting)' : ''}"><span class="n">${i}</span>${e ? `<span class="v">${T_SHORT[e.ticket]}</span>` : (rv ? '<span class="v">SEEN</span>' : '')}${node}</div>`;
+  }
+  return h + '</div>';
+}
+const nextReveal = () => REVEALS.find(r => r > state.log.length);
+function logCard(showAll){
+  const n = nextReveal();
+  const trk = state.tracker && state.view !== 'end'
+    ? `<button type="button" class="toggle" data-act="tracker" aria-pressed="${showSuspects}"><span>Show where the Shadow could be <b class="mono">(${state.suspects.length})</b></span><span class="sw"></span></button>` : '';
+  return `<div class="card"><div class="eyebrow">Shadow's travel log${n ? ` · next sighting on move ${n}` : ''}</div>${logGrid(showAll)}${trk}</div>`;
+}
+function rosterCard(){
+  return `<div class="card"><div class="eyebrow">Agents</div><div class="roster">${state.agents.map((a, i) => `
+    <div class="ag"><span class="dot" style="color:${a.color};background:${a.color}"></span>
+      <span class="nm${state.view === 'agents' && i === state.turnAgent ? ' on' : ''}">${esc(a.name)} <span class="at">at ${a.pos}</span></span>
+      <span class="mini"><span class="c-cab">${a.tickets.cab}</span><span class="c-tram">${a.tickets.tram}</span><span class="c-metro">${a.tickets.metro}</span></span></div>`).join('')}</div></div>`;
+}
+
+function renderPanel(){
+  const p = $('#panel');
+  if (screen !== 'game' || !state || state.view.startsWith('cover')){ p.innerHTML = ''; return; }
+  const v = state.view;
+  let h = '';
+  if (v === 'shadow'){
+    const moveNo = state.log.length + 1;
+    h += `<div class="card turn-head"><span class="eyebrow">Secret turn · keep this screen to yourself</span>
+      <h2><span class="diamond"></span>${esc(state.shadowName)}</h2>
+      <p>You are hiding at <b class="mono">${state.shadow.pos}</b>.${state.shadowDone ? '' : ` This is move <b class="mono">${moveNo}</b> of ${MOVES_TOTAL}.`}</p></div>`;
+    if (state.shadowDone){
+      const lines = state.turnMoves.map(m => `<li>Move ${m.move}: ${T_LABEL[m.ticket]} to <b class="mono">${m.node}</b>${m.reveal ? ' (agents will see this)' : ''}</li>`).join('');
+      h += `<div class="card"><div class="eyebrow">Your move is in</div><ul style="margin:0;padding-left:18px">${lines}</ul>
+        <p class="hint">Hide the screen, then hand the device to the agents.</p>
+        <button type="button" class="primary" data-act="pass">Hide and pass to the agents</button></div>`;
+    } else {
+      const opts = shadowOptions();
+      if (REVEALS.includes(moveNo)) h += `<div class="alert hot">Move ${moveNo} is a sighting. The agents will see where you land.</div>`;
+      if (state.sprint.step === 2) h += `<div class="alert">Sprint: make your second move now.</div>`;
+      h += `<div class="card">${pickBox(opts)}${moveList(opts)}</div>`;
+      const T = state.shadow.tickets;
+      const canSprint = T.sprint > 0 && state.sprint.step !== 2 && state.log.length <= MOVES_TOTAL - 2;
+      h += `<div class="card"><div class="eyebrow">Your tickets</div>${wallet(T, ['cab','tram','metro','smoke','sprint'])}
+        ${canSprint ? `<button type="button" class="toggle" data-act="sprint" aria-pressed="${state.sprint.active}"><span><b>Sprint</b> · move twice this turn</span><span class="sw"></span></button>` : ''}
+        <p class="hint">Smoke hides which transport you took and is the only ticket that rides the ferry.</p></div>`;
+    }
+    h += logCard(true);
+  }
+  if (v === 'agents'){
+    const a = state.agents[state.turnAgent], opts = agentOptions(state.turnAgent);
+    if (state.spottedFresh && state.lastReveal) h += `<div class="alert hot">Sighting: the Shadow was seen at <b>${state.lastReveal.node}</b> on move ${state.lastReveal.move}.</div>`;
+    const last = state.log[state.log.length - 1];
+    h += `<div class="card turn-head"><span class="eyebrow">Agent ${state.turnAgent + 1} of ${state.agents.length}</span>
+      <h2><span class="dot" style="color:${a.color};background:${a.color}"></span>${esc(a.name)}</h2>
+      <p>At <b class="mono">${a.pos}</b>. The Shadow's last ticket: <b>${last ? T_LABEL[last.ticket] : '—'}</b>.</p></div>`;
+    if (opts.size){
+      h += `<div class="card">${pickBox(opts)}${moveList(opts)}${wallet(a.tickets, ['cab','tram','metro'])}</div>`;
+    } else {
+      h += `<div class="card"><p>${esc(a.name)} has no legal move from ${a.pos} and sits this turn out.</p><button type="button" class="secondary" data-act="skip">Next agent</button></div>`;
+    }
+    h += logCard(false) + rosterCard();
+  }
+  if (v === 'end'){
+    const win = state.winner === 'agents';
+    const seen = state.log.filter(e => e.reveal).length, smoke = state.log.filter(e => e.ticket === 'smoke').length;
+    h += `<div class="card result"><span class="eyebrow">Game over</span><h2>${win ? 'The agents win' : esc(state.shadowName) + ' escapes'}</h2>
+      <p class="hint" style="font-size:15px">${esc(state.reason)}</p>
+      <div class="stats"><div class="stat"><b>${state.log.length}</b><span>Moves</span></div><div class="stat"><b>${seen}</b><span>Sightings</span></div><div class="stat"><b>${smoke}</b><span>Smoke used</span></div></div>
+      <p class="hint">The violet line on the map is the Shadow's full route, starting at ${state.shadowStart}.</p>
+      <button type="button" class="primary" data-act="again">Play again</button></div>`;
+    h += logCard(true) + rosterCard();
+  }
+  p.innerHTML = h;
+  const row = p.querySelector('.mrow.picked');
+  if (row) row.scrollIntoView({block:'nearest'});
+}
+
+function renderStatus(){
+  const s = $('#status');
+  if (screen !== 'game' || !state){ s.innerHTML = ''; return; }
+  const n = nextReveal();
+  s.innerHTML = `Move <b>${state.log.length}</b>/${MOVES_TOTAL}${n && state.view !== 'end' ? ` · sighting on <b>${n}</b>` : ''}`;
+}
+
+/* ---------- Overlays ---------- */
+function renderSetup(){
+  const o = $('#setup');
+  o.hidden = screen !== 'setup';
+  if (o.hidden) return;
+  const saved = load();
+  const resume = saved && saved.phase !== 'over';
+  const c = setupCfg;
+  o.innerHTML = `<form class="sheet" id="setupForm" autocomplete="off">
+    <div><div class="eyebrow">Pass-and-play · 3 to 5 players · one device</div><h1>Shadow Trail</h1></div>
+    <p>One player is the Shadow, moving in secret through Port Veyra. Everyone else runs the agents and tries to corner them before move ${MOVES_TOTAL}.</p>
+    <div class="field"><label for="shadowName">Shadow player</label><input type="text" id="shadowName" maxlength="18" value="${esc(c.shadowName)}"></div>
+    <div class="field"><span class="lbl">Agents</span><div class="seg">${[2,3,4].map(k => `<button type="button" data-act="count" data-n="${k}" aria-pressed="${c.count === k}">${k}</button>`).join('')}</div></div>
+    <div class="agent-names">${c.names.slice(0, c.count).map((nm, i) => `<div class="an"><span class="dot" style="color:${AGENT_COLORS[i]};background:${AGENT_COLORS[i]}"></span><input type="text" id="agent${i}" maxlength="14" value="${esc(nm)}" aria-label="Agent ${i + 1} name" style="background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:8px 10px;width:100%;min-width:0"></div>`).join('')}</div>
+    <button type="button" class="toggle" data-act="setup-tracker" aria-pressed="${c.tracker}"><span><b>Hideout tracker</b> · shade every crossing the Shadow could be on</span><span class="sw"></span></button>
+    <details class="rules"><summary>How to play</summary>${rulesList()}</details>
+    <div class="actions">${resume ? `<button type="button" class="secondary" data-act="resume">Resume game (move ${saved.log.length})</button>` : ''}<button type="submit" class="primary">Start new game</button></div>
+  </form>`;
+  $('#setupForm').addEventListener('submit', e => { e.preventDefault(); readSetup(); newGame(setupCfg); });
+}
+function readSetup(){
+  const sn = $('#shadowName'); if (sn) setupCfg.shadowName = sn.value;
+  for (let i = 0; i < 4; i++){ const f = $('#agent' + i); if (f) setupCfg.names[i] = f.value; }
+}
+function rulesList(){
+  return `<ul>
+    <li><b>Turn order.</b> The Shadow moves first, in secret. Then every agent moves once, in order.</li>
+    <li><b>Tickets.</b> Each move along a line costs that line's ticket: <b>Cab</b> (amber streets), <b>Tram</b> (teal), <b>Metro</b> (red, long jumps). Agents start with 10 / 8 / 4.</li>
+    <li><b>The log.</b> Agents see which ticket the Shadow used, never where it went, except on sighting moves <b>${REVEALS.join(', ')}</b>.</li>
+    <li><b>Smoke</b> tickets hide the transport used and are the only way onto the <b>ferry</b>. <b>Sprint</b> lets the Shadow move twice in one turn.</li>
+    <li><b>Spent tickets.</b> Every ticket an agent spends goes to the Shadow.</li>
+    <li><b>Blocking.</b> Nobody can move onto a crossing an agent is standing on.</li>
+    <li><b>Winning.</b> Agents win by landing on the Shadow or leaving it no move. The Shadow wins by lasting ${MOVES_TOTAL} moves, or if no agent can move.</li>
+  </ul>`;
+}
+function renderCover(){
+  const o = $('#cover');
+  const on = screen === 'game' && state && state.view.startsWith('cover');
+  o.hidden = !on;
+  if (!on) return;
+  if (state.view === 'cover-shadow'){
+    const first = state.log.length === 0;
+    o.innerHTML = `<div class="sheet cover"><div class="big diamond"></div><div class="eyebrow">Move ${state.log.length + 1} of ${MOVES_TOTAL}</div>
+      <h1>Pass to ${esc(state.shadowName)}</h1>
+      <p>Agents, look away. Only the Shadow should see the next screen${first ? ', which shows where the Shadow starts' : ''}.</p>
+      <button type="button" class="primary" data-act="show-shadow">I'm ${esc(state.shadowName)}. Show my position</button></div>`;
+  } else {
+    const m = state.turnMoves.length;
+    o.innerHTML = `<div class="sheet cover"><div class="big" style="display:flex;gap:8px;justify-content:center;align-items:center;width:auto">${state.agents.map(a => `<span class="dot" style="width:22px;height:22px;color:${a.color};background:${a.color}"></span>`).join('')}</div>
+      <div class="eyebrow">The Shadow moved ${m === 2 ? 'twice' : 'once'}</div>
+      <h1>Agents' turn</h1>
+      <p>Shadow, hand the device over now.${state.spottedFresh ? ' There is a sighting waiting.' : ''}</p>
+      <button type="button" class="primary" data-act="show-agents">Agents ready</button></div>`;
+  }
+}
+function openModal(html){ const m = $('#modal'); m.innerHTML = `<div class="sheet">${html}</div>`; m.hidden = false; }
+function closeModal(){ $('#modal').hidden = true; }
+
+function render(){
+  renderSetup(); renderCover(); renderStatus(); renderBoard(); renderPanel();
+  $('#quitBtn').hidden = screen !== 'game';
+}
+
+/* ---------- Sizing ---------- */
+const scroller = $('#boardScroll');
+function sizeMap(){
+  const wide = window.matchMedia('(min-width: 861px)').matches;
+  const w = scroller.clientWidth;
+  let base = w;
+  if (wide){ const avail = window.innerHeight - scroller.getBoundingClientRect().top - 60; base = Math.max(360, Math.min(w, avail)); }
+  const px = Math.round(base * zoom);
+  svg.style.width = px + 'px'; svg.style.height = px + 'px';
+  scroller.style.height = Math.round(base) + 2 + 'px';
+}
+function centerOn(id){
+  const n = CITY.nodes[id]; if (!n) return;
+  const px = svg.clientWidth / 1000;
+  scroller.scrollTo({left:n.x * px - scroller.clientWidth / 2, top:n.y * px - scroller.clientHeight / 2, behavior:'smooth'});
+}
+function setZoom(z){
+  const cx = (scroller.scrollLeft + scroller.clientWidth / 2) / svg.clientWidth, cy = (scroller.scrollTop + scroller.clientHeight / 2) / svg.clientHeight;
+  zoom = Math.max(1, Math.min(2.6, z));
+  sizeMap();
+  scroller.scrollLeft = cx * svg.clientWidth - scroller.clientWidth / 2;
+  scroller.scrollTop = cy * svg.clientHeight - scroller.clientHeight / 2;
+}
+
+/* ---------- Actions ---------- */
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const act = b.dataset.act;
+  switch (act){
+    case 'move': {
+      const to = +b.dataset.to, t = b.dataset.t;
+      if (state.view === 'shadow') doShadowMove(to, t); else if (state.view === 'agents') doAgentMove(to, t);
+      break; }
+    case 'sprint':
+      if (state.sprint.step !== 2){ state.sprint = state.sprint.active ? {active:false, step:0} : {active:true, step:1}; save(); render(); }
+      break;
+    case 'pass': state.phase = 'agents'; state.view = 'cover-agents'; state.turnAgent = 0; save(); render(); break;
+    case 'show-shadow':
+      state.view = 'shadow'; state.selected = null; save(); render(); centerOn(state.shadow.pos);
+      if (shadowOptions().size === 0) endGame('agents', `The Shadow is cornered at ${state.shadow.pos} with nowhere left to go.`);
+      break;
+    case 'show-agents': state.view = 'agents'; save(); render(); centerOn(state.agents[0].pos); break;
+    case 'skip': nextAgent(); break;
+    case 'tracker': showSuspects = !showSuspects; render(); break;
+    case 'zoom-in': setZoom(zoom * 1.3); break;
+    case 'zoom-out': setZoom(zoom / 1.3); break;
+    case 'count': readSetup(); setupCfg.count = +b.dataset.n; renderSetup(); break;
+    case 'setup-tracker': readSetup(); setupCfg.tracker = !setupCfg.tracker; renderSetup(); break;
+    case 'resume': {
+      const s = load(); if (!s) break;
+      state = s; if (state.view === 'shadow') state.view = 'cover-shadow';
+      screen = 'game'; render(); break; }
+    case 'again': screen = 'setup'; render(); break;
+    case 'rules': openModal(`<h3>How to play</h3><div class="rules">${rulesList()}</div><button type="button" class="primary" data-act="close">Got it</button>`); break;
+    case 'quit': openModal(`<h3>Start a new game?</h3><p>The current game will be lost.</p><div class="actions"><button type="button" class="secondary" data-act="close">Keep playing</button><button type="button" class="primary" data-act="confirm-quit">Start over</button></div>`); break;
+    case 'confirm-quit': closeModal(); if (state){ state.phase = 'over'; save(); } screen = 'setup'; render(); break;
+    case 'close': closeModal(); break;
+  }
+});
+$('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+
+/* ---------- Boot ---------- */
+drawStatic();
+window.addEventListener('resize', sizeMap);
+function start(data){
+  if (data && data.state){ state = data.state; screen = data.screen || 'game'; if (state.view === 'shadow') state.view = 'cover-shadow'; }
+  zoom = window.matchMedia('(max-width: 860px)').matches ? 1.5 : 1;
+  render(); sizeMap();
+}
+try { window.claude?.hot?.snapshot?.(() => ({state, screen})); } catch (e) {}
+if (window.claude?.hot?.ready) window.claude.hot.ready(start); else start(window.claude?.hot?.data ?? {});
+})();
+</script>
+</body>
+</html>
