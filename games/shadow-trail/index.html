@@ -9,11 +9,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-/* Layout: a square night-time transit map beside a dispatch panel; the panel drops below the map on phones */
+/* Layout: a pan-and-zoom transit map beside a dispatch panel; the panel drops below the map on phones */
 :root{
   --ink:#0a0f1a; --ground:#0e1625; --block:#142136; --park:#11302b; --panel:#121c2d; --raise:#18243a; --line:#26344d;
   --text:#e9eef7; --muted:#8c9bb4; --node:#1a2740; --node-edge:#3d4e6e;
-  --cab:#f3b53f; --tram:#33c7a0; --metro:#ff5d6c; --smoke:#a98cff; --river:#15345a; --river-edge:#1d4673;
+  --taxi:#f3b53f; --bus:#33c7a0; --train:#ff5d6c; --smoke:#a98cff; --river:#15345a; --river-edge:#1d4673; --ok:#7fd99a;
   --f-display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
   --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
@@ -21,239 +21,364 @@
 }
 html,body{height:100%}
 [hidden]{display:none!important}
-body{background:var(--ink);color:var(--text);font-family:var(--f-body);font-size:15px;line-height:1.45}
-button,input{font:inherit;color:inherit}
+body{background:var(--ink);color:var(--text);font-family:var(--f-body);font-size:15px;line-height:1.45;margin:0}
+button,input,textarea,select{font:inherit;color:inherit}
 button{cursor:pointer}
+button:disabled{cursor:not-allowed}
 :focus-visible{outline:2px solid var(--smoke);outline-offset:2px}
 .mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.no-motion *{animation:none!important;transition:none!important}
 
 #app{min-height:100%;display:flex;flex-direction:column}
-.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-block:10px;
+.top{display:flex;align-items:center;justify-content:space-between;gap:8px 14px;flex-wrap:wrap;padding-block:10px;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:baseline;gap:10px;min-width:0}
 .brand b{font-family:var(--f-display);font-weight:900;font-size:28px;letter-spacing:.06em;text-transform:uppercase;line-height:1}
 .brand span{color:var(--muted);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
-.top-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.status{font-family:var(--f-mono);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.status{font-family:var(--f-mono);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;flex:1 1 auto;text-align:right;min-width:0}
 .status b{color:var(--text)}
+.menu{display:flex;gap:6px;flex-wrap:wrap}
 .ghost-btn{background:transparent;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;color:var(--muted)}
-.ghost-btn:hover{color:var(--text);border-color:var(--node-edge)}
-@media (max-width:600px){.brand span{display:none}.brand b{font-size:24px}.top{row-gap:6px}.top-right{flex:1 1 100%;justify-content:space-between}.status{margin-right:auto}}
+.ghost-btn:hover:not(:disabled){color:var(--text);border-color:var(--node-edge)}
+.ghost-btn:disabled{opacity:.35}
+@media (max-width:640px){.brand span{display:none}.brand b{font-size:24px}.status{flex-basis:100%;text-align:left;order:3}}
 
-.game{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:18px;padding-block:16px;
+.game{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:18px;padding-block:14px;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-@media (max-width:860px){.game{grid-template-columns:minmax(0,1fr);gap:14px}}
-.board{position:relative;min-width:0;display:flex;flex-direction:column;gap:8px}
-.board-scroll{overflow:auto;border:1px solid var(--line);border-radius:14px;background:var(--ground);-webkit-overflow-scrolling:touch}
-#map{display:block;margin:0 auto;touch-action:manipulation;user-select:none;-webkit-user-select:none}
-.zoom{position:absolute;top:10px;right:10px;display:flex;gap:6px;z-index:2}
-.zoom button{width:36px;height:36px;border-radius:9px;border:1px solid var(--line);background:rgba(18,28,45,.92);font-size:20px;line-height:1}
-.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--muted)}
+.board{position:relative;min-width:0;height:calc(100dvh - 92px);min-height:420px;display:flex;flex-direction:column;gap:8px}
+#map{flex:1;min-height:0;width:100%;display:block;background:var(--ground);border:1px solid var(--line);border-radius:14px;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
+#map.dragging{cursor:grabbing}
+.tools{position:absolute;top:10px;right:10px;display:flex;gap:6px;z-index:2}
+.tools button{min-width:38px;height:38px;padding:0 10px;border-radius:9px;border:1px solid var(--line);background:rgba(18,28,45,.92);font-size:14px}
+.tools button.sym{font-size:20px;line-height:1}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12px;color:var(--muted);flex:none}
 .legend i{display:inline-block;width:22px;height:4px;border-radius:2px;vertical-align:middle;margin-right:6px}
+.panel{display:flex;flex-direction:column;gap:14px;min-width:0;max-height:calc(100dvh - 92px);overflow:auto;padding-bottom:12px}
+@media (max-width:900px){
+  .game{grid-template-columns:minmax(0,1fr);gap:14px}
+  .board{height:66dvh;min-height:320px}
+  .panel{max-height:none;overflow:visible}
+}
 
 /* SVG map */
+.ground{fill:var(--ground)}
 .blk{fill:var(--block)} .blk.park{fill:var(--park)}
-.river{fill:none;stroke:var(--river);stroke-width:58;stroke-linecap:round}
-.river-edge{fill:none;stroke:var(--river-edge);stroke-width:64;stroke-linecap:round}
-.river-name{font-family:var(--f-mono);font-size:15px;letter-spacing:.5em;fill:#4f7fb3}
+.river{fill:none;stroke:var(--river);stroke-linecap:round}
+.river-edge{fill:none;stroke:var(--river-edge);stroke-linecap:round}
+.river-name{font-family:var(--f-mono);letter-spacing:.5em;fill:#4f7fb3}
 .e{fill:none;stroke-linecap:round}
-.e-cab{stroke:var(--cab);stroke-width:3.5;opacity:.62}
-.e-casing{stroke:var(--node-edge);stroke-width:15}
-.e-tram{stroke:var(--tram);stroke-width:5;opacity:.85}
-.e-metro{stroke:var(--metro);stroke-width:6;opacity:.85}
-.e-ferry{stroke:var(--smoke);stroke-width:4;stroke-dasharray:10 9;opacity:.9}
-.n-core{fill:var(--node);stroke:var(--node-edge);stroke-width:3}
-.n-core.tram{stroke:var(--tram);stroke-width:4}
-.n-metro{fill:none;stroke:var(--metro);stroke-width:4}
-.n-pier{fill:none;stroke:var(--smoke);stroke-width:3;stroke-dasharray:5 4}
-.n-label{font-family:var(--f-mono);font-weight:600;font-size:19px;fill:var(--text);text-anchor:middle;dominant-baseline:central;pointer-events:none}
-.suspect{fill:var(--smoke);fill-opacity:.22;stroke:var(--smoke);stroke-opacity:.55;stroke-width:2}
-.dest{fill:#fff;fill-opacity:.07;stroke:#fff;stroke-width:3;stroke-dasharray:7 6;animation:spin 6s linear infinite;transform-box:fill-box;transform-origin:center}
-.dest.faint{stroke-opacity:.35;fill-opacity:0;animation:none}
-.dest.picked{stroke:var(--smoke);stroke-width:5;stroke-dasharray:none;fill:var(--smoke);fill-opacity:.25;animation:none}
-.cur-ring{fill:none;stroke-width:4;animation:pulse 1.4s ease-in-out infinite}
+.e-taxi{stroke:var(--taxi);opacity:.62}
+.e-casing{stroke:var(--node-edge)}
+.e-bus{stroke:var(--bus);opacity:.85}
+.e-train{stroke:var(--train);opacity:.85}
+.e-ferry{stroke:var(--smoke);opacity:.9}
+.n-core{fill:var(--node);stroke:var(--node-edge)}
+.n-core.bus{stroke:var(--bus)}
+.n-ring{fill:rgba(10,15,26,.15);stroke:#fff;stroke-opacity:.85}
+.n-train{fill:none;stroke:var(--train)}
+.n-pier{fill:none;stroke:var(--smoke)}
+.n-label{font-family:var(--f-mono);font-weight:600;fill:var(--text);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.suspect{fill:var(--smoke);fill-opacity:.24;stroke:var(--smoke);stroke-opacity:.6}
+.dest{fill:#fff;fill-opacity:.08;stroke:#fff;animation:spin 6s linear infinite;transform-box:fill-box;transform-origin:center}
+.dest.faint{stroke-opacity:.38;fill-opacity:0;animation:none}
+.dest.picked{stroke:var(--smoke);fill:var(--smoke);fill-opacity:.28;animation:none}
+.inspect{fill:none;stroke:#fff;stroke-opacity:.9}
+.cur-ring{fill:none;animation:pulse 1.4s ease-in-out infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes pulse{50%{stroke-opacity:.25}}
-.tok-label{font-family:var(--f-mono);font-weight:600;font-size:18px;fill:var(--ink);text-anchor:middle;dominant-baseline:central;pointer-events:none}
-.seen-ring{fill:none;stroke:var(--smoke);stroke-width:3;stroke-dasharray:4 5}
+.tok-label{font-family:var(--f-mono);font-weight:600;fill:var(--ink);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.seen-ring{fill:none;stroke:var(--smoke)}
 .seen-tag{fill:var(--smoke)}
-.seen-text{font-family:var(--f-mono);font-size:14px;font-weight:600;fill:var(--ink);text-anchor:middle;dominant-baseline:central}
-.route{fill:none;stroke:var(--smoke);stroke-width:7;stroke-linejoin:round;stroke-linecap:round;opacity:.75}
+.seen-text{font-family:var(--f-mono);font-weight:600;fill:var(--ink);text-anchor:middle;dominant-baseline:central}
+.route{fill:none;stroke:var(--smoke);stroke-linejoin:round;stroke-linecap:round;opacity:.8}
 .route-dot{fill:var(--smoke)}
-.route-num{font-family:var(--f-mono);font-size:13px;font-weight:600;fill:var(--text)}
-.hit{fill:transparent;cursor:pointer}
+.hit{fill:transparent}
+.ed-start{fill:none;stroke:var(--ok)}
+.ed-sel{fill:none;stroke:var(--smoke)}
 @media (prefers-reduced-motion:reduce){.dest,.cur-ring{animation:none}}
 
 /* Panel */
-.panel{display:flex;flex-direction:column;gap:14px;min-width:0;align-self:start}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
 .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
-.turn-head h2{font-family:var(--f-display);font-weight:900;font-size:34px;line-height:1;letter-spacing:.03em;text-transform:uppercase;margin:2px 0 4px;text-wrap:balance;display:flex;align-items:center;gap:10px}
+.turn-head h2{font-family:var(--f-display);font-weight:900;font-size:34px;line-height:1;letter-spacing:.03em;text-transform:uppercase;margin:2px 0 4px;text-wrap:balance;display:flex;align-items:center;gap:10px;overflow-wrap:anywhere}
 .turn-head p{margin:0;color:var(--muted)}
 .turn-head p b{color:var(--text)}
-.dot{width:16px;height:16px;border-radius:50%;flex:none;border:2px solid var(--ink);box-shadow:0 0 0 2px currentColor}
+.dot{width:16px;height:16px;border-radius:50%;flex:none;border:2px solid var(--ink);box-shadow:0 0 0 2px var(--c,currentColor);background:var(--c,currentColor)}
 .diamond{width:16px;height:16px;flex:none;background:var(--smoke);transform:rotate(45deg);border-radius:2px}
 .alert{border-radius:10px;padding:10px 12px;font-size:14px;background:rgba(169,140,255,.14);border:1px solid rgba(169,140,255,.45)}
 .alert.hot{background:rgba(255,93,108,.13);border-color:rgba(255,93,108,.5)}
+.alert.good{background:rgba(127,217,154,.12);border-color:rgba(127,217,154,.45)}
 .alert b{font-family:var(--f-mono)}
 .wallet{display:flex;flex-wrap:wrap;gap:6px}
 .tk{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px 3px 4px;font-size:12px;background:var(--raise);border:1px solid var(--line)}
-.tk b{font-family:var(--f-mono);min-width:22px;height:22px;border-radius:999px;display:inline-grid;place-items:center;color:var(--ink);font-size:12px}
+.tk b{font-family:var(--f-mono);min-width:24px;height:22px;padding:0 4px;border-radius:999px;display:inline-grid;place-items:center;color:var(--ink);font-size:12px;background:var(--tc)}
 .tk.zero{opacity:.4}
-.tk.cab b{background:var(--cab)} .tk.tram b{background:var(--tram)} .tk.metro b{background:var(--metro)} .tk.smoke b{background:var(--smoke)} .tk.sprint b{background:var(--text)}
+.k-taxi{--tc:var(--taxi)} .k-bus{--tc:var(--bus)} .k-train{--tc:var(--train)} .k-smoke{--tc:var(--smoke)} .k-double{--tc:var(--text)} .k-ferry{--tc:var(--smoke)}
 .step{display:flex;flex-direction:column;gap:10px}
 .step-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .link{background:none;border:0;padding:4px 0;color:var(--smoke);font-size:13px;font-weight:600;text-decoration:underline;text-underline-offset:3px}
 .modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-.mode{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:12px 12px 11px 16px;border-radius:12px;border:1px solid var(--line);background:var(--raise);position:relative;overflow:hidden;min-height:64px}
-.mode::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--mc)}
-.mode b{font-family:var(--f-display);font-weight:900;font-size:24px;letter-spacing:.05em;text-transform:uppercase;line-height:1;color:var(--mc)}
+.mode{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:12px 12px 11px 16px;border-radius:12px;border:1px solid var(--line);background:var(--raise);position:relative;overflow:hidden;min-height:66px}
+.mode::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--tc)}
+.mode b{font-family:var(--f-display);font-weight:900;font-size:24px;letter-spacing:.05em;text-transform:uppercase;line-height:1;color:var(--tc)}
 .mode span{font-size:12px;color:var(--muted)}
-.mode:hover:not(:disabled){border-color:var(--mc)}
-.mode:disabled{opacity:.38;cursor:not-allowed}
-.mode.cab,.go.cab{--mc:var(--cab)} .mode.tram,.go.tram{--mc:var(--tram)} .mode.metro,.go.metro{--mc:var(--metro)} .mode.smoke,.go.smoke{--mc:var(--smoke)}
+.mode em{font-style:normal;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);background:var(--taxi);border-radius:4px;padding:1px 5px;position:absolute;top:8px;right:8px}
+.mode:hover:not(:disabled){border-color:var(--tc)}
+.mode:disabled{opacity:.36}
 .dests{display:flex;flex-wrap:wrap;gap:8px}
 .dest-btn{font-family:var(--f-mono);font-weight:600;font-size:18px;min-width:56px;min-height:48px;border-radius:10px;background:var(--node);border:2px solid var(--node-edge)}
 .dest-btn:hover{border-color:var(--text)}
 .dest-btn.on{background:var(--text);color:var(--ink);border-color:var(--text)}
-.primary.go{background:var(--mc);color:var(--ink)}
+.confirm{display:flex;gap:8px;flex-wrap:wrap}
+.confirm .primary{flex:1 1 200px}
 .hint{color:var(--muted);font-size:13px;margin:0}
 .primary{border:0;border-radius:10px;padding:12px 16px;font-weight:600;background:var(--text);color:var(--ink);font-size:15px}
-.primary:hover{filter:brightness(.92)}
-.secondary{border:1px solid var(--line);border-radius:10px;padding:11px 16px;font-weight:600;background:var(--raise)}
-.toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:10px;background:var(--raise);border:1px solid var(--line);text-align:left;width:100%}
+.primary:hover:not(:disabled){filter:brightness(.92)}
+.primary:disabled{opacity:.4}
+.primary.tint{background:var(--tc)}
+.secondary{border:1px solid var(--line);border-radius:10px;padding:11px 16px;font-weight:600;background:var(--raise);text-decoration:none;text-align:center}
+.secondary:hover:not(:disabled){border-color:var(--node-edge)}
+.secondary.small,.primary.small{padding:7px 12px;font-size:13px}
+.danger{border-color:rgba(255,93,108,.55);color:#ffb3ba}
+.toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border-radius:10px;background:var(--raise);border:1px solid var(--line);text-align:left;width:100%}
 .toggle[aria-pressed="true"]{border-color:var(--smoke);background:rgba(169,140,255,.14)}
 .toggle .sw{width:36px;height:20px;border-radius:999px;background:var(--line);position:relative;flex:none}
 .toggle .sw::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:var(--muted);transition:transform .15s}
 .toggle[aria-pressed="true"] .sw{background:var(--smoke)}
 .toggle[aria-pressed="true"] .sw::after{transform:translateX(16px);background:var(--ink)}
-.roster{display:flex;flex-direction:column;gap:6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip-btn{border:0;border-radius:8px;padding:7px 11px;font-weight:600;font-size:13px;color:var(--ink);background:var(--tc)}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;font-size:13px;margin:0}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;font-family:var(--f-mono);overflow-wrap:anywhere}
+.roster{display:flex;flex-direction:column;gap:7px}
 .ag{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;font-size:13px}
 .ag .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ag .nm.on{font-weight:600}
 .ag .at{font-family:var(--f-mono);color:var(--muted)}
 .ag .mini{font-family:var(--f-mono);font-size:12px;color:var(--muted);display:flex;gap:8px}
+.ag .mini span{color:var(--tc)}
 .ag .mini span::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;background:currentColor}
-.c-cab{color:var(--cab)} .c-tram{color:var(--tram)} .c-metro{color:var(--metro)}
-.tlog{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));gap:4px}
-.slot{border-radius:6px;background:var(--raise);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:46px;padding:2px 0;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.tlog{display:grid;grid-template-columns:repeat(auto-fill,minmax(27px,1fr));gap:4px}
+.slot{border-radius:6px;background:var(--raise);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:46px;padding:2px 0;font-family:var(--f-mono);font-variant-numeric:tabular-nums;overflow:hidden}
 .slot .n{font-size:9px;color:var(--muted)}
-.slot .v{font-size:10px;font-weight:600}
+.slot .v{font-size:9px;font-weight:600}
 .slot .p{font-size:11px;font-weight:600}
 .slot.reveal{border-color:var(--smoke);border-width:2px}
-.slot.t-cab{background:var(--cab);color:var(--ink)} .slot.t-tram{background:var(--tram);color:var(--ink)} .slot.t-metro{background:var(--metro);color:var(--ink)} .slot.t-smoke{background:var(--ink);color:var(--smoke);border-color:var(--smoke)}
+.slot.t-taxi{background:var(--taxi);color:var(--ink)} .slot.t-bus{background:var(--bus);color:var(--ink)} .slot.t-train{background:var(--train);color:var(--ink)} .slot.t-smoke{background:var(--ink);color:var(--smoke);border-color:var(--smoke)}
 .slot[class*="t-"] .n{color:inherit;opacity:.7}
-.slot.t-smoke.reveal{box-shadow:inset 0 0 0 1px var(--smoke)}
-.result h2{font-family:var(--f-display);font-weight:900;font-size:44px;line-height:.95;text-transform:uppercase;letter-spacing:.03em;margin:4px 0;text-wrap:balance}
+.loglist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;max-height:220px;overflow:auto;font-size:13px}
+.loglist li{display:grid;grid-template-columns:34px auto minmax(0,1fr);gap:8px;align-items:center;padding:4px 6px;border-radius:6px;background:var(--raise)}
+.loglist .tn{font-family:var(--f-mono);color:var(--muted);font-size:12px}
+.loglist .tt{font-size:11px;font-weight:600;color:var(--ink);background:var(--tc);border-radius:4px;padding:1px 6px;text-transform:uppercase;letter-spacing:.05em}
+.loglist .tx{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+details.fold summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center}
+details.fold summary::after{content:"Show";font-size:12px;color:var(--smoke);font-weight:600}
+details.fold[open] summary::after{content:"Hide"}
+details.fold summary::-webkit-details-marker{display:none}
+.result h2{font-family:var(--f-display);font-weight:900;font-size:44px;line-height:.95;text-transform:uppercase;letter-spacing:.03em;margin:4px 0;text-wrap:balance;overflow-wrap:anywhere}
 .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .stat{background:var(--raise);border-radius:10px;padding:8px 10px}
 .stat b{display:block;font-family:var(--f-mono);font-size:20px}
 .stat span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.replay{display:flex;flex-direction:column;gap:8px}
+.rp-btns{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.rp-btns button{padding:8px 0;font-size:13px}
+.replay input[type=range]{width:100%;accent-color:var(--smoke)}
+.vlist{margin:0;padding-left:18px;font-size:13px;display:flex;flex-direction:column;gap:4px}
+.vlist.err li::marker{color:var(--train)}
+.vlist.warn li::marker{color:var(--taxi)}
 
 /* Overlays */
-.overlay{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;overflow:auto;
+.overlay{position:fixed;inset:0;z-index:20;display:flex;align-items:flex-start;justify-content:center;overflow:auto;
   padding-block:calc(env(safe-area-inset-top,0px) + 20px) calc(env(safe-area-inset-bottom,0px) + 20px);
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-.overlay.dim{background:rgba(6,10,18,.78);backdrop-filter:blur(3px)}
-.overlay.solid{background:var(--ink)}
-.sheet{width:100%;max-width:520px;margin:auto;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px;display:flex;flex-direction:column;gap:16px}
-.sheet h1{font-family:var(--f-display);font-weight:900;font-size:52px;line-height:.9;letter-spacing:.04em;text-transform:uppercase;margin:0}
+.overlay.dim{background:rgba(6,10,18,.8);backdrop-filter:blur(3px)}
+.overlay.solid{background:var(--ink);align-items:center}
+#modal{z-index:30;align-items:center}
+.sheet{width:100%;max-width:560px;margin:auto;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px;display:flex;flex-direction:column;gap:16px}
+.sheet.wide{max-width:680px}
+.sheet h1{font-family:var(--f-display);font-weight:900;font-size:52px;line-height:.9;letter-spacing:.04em;text-transform:uppercase;margin:0;overflow-wrap:anywhere}
 .sheet h3{font-family:var(--f-display);font-weight:700;font-size:22px;letter-spacing:.04em;text-transform:uppercase;margin:0}
 .sheet p{margin:0;color:var(--muted)}
-.field{display:flex;flex-direction:column;gap:6px}
+fieldset{border:1px solid var(--line);border-radius:14px;padding:12px 14px 14px;margin:0;display:flex;flex-direction:column;gap:12px;min-width:0}
+legend{font-family:var(--f-display);font-weight:700;font-size:18px;letter-spacing:.06em;text-transform:uppercase;padding:0 6px}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
 .field label,.field .lbl{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-.field input[type=text]{background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
-.seg{display:flex;gap:6px}
-.seg button{flex:1;padding:9px 0;border-radius:10px;border:1px solid var(--line);background:var(--raise);font-family:var(--f-mono);font-weight:600}
+.inp{background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:9px 11px;width:100%;min-width:0;box-sizing:border-box}
+textarea.inp{font-family:var(--f-mono);font-size:12px;min-height:180px;resize:vertical}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:480px){.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{flex:1 1 0;min-width:44px;padding:9px 6px;border-radius:10px;border:1px solid var(--line);background:var(--raise);font-weight:600;font-size:14px}
 .seg button[aria-pressed="true"]{background:var(--text);color:var(--ink);border-color:var(--text)}
+.seg button:disabled{opacity:.35}
 .agent-names{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-.agent-names .an{display:flex;align-items:center;gap:8px}
+.agent-names .an{display:flex;align-items:center;gap:8px;min-width:0}
 .agent-names .an .dot{width:12px;height:12px}
 .actions{display:flex;gap:10px;flex-wrap:wrap}
 .actions>*{flex:1 1 160px}
+.err-box{color:#ffb3ba;font-size:14px;margin:0}
 .rules{font-size:14px;color:var(--muted)}
 .rules summary{cursor:pointer;color:var(--text);font-weight:600}
 .rules ul{margin:10px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
 .rules b{color:var(--text)}
 .cover{max-width:460px;text-align:center;align-items:center;gap:18px;padding:32px 24px}
-.cover .big{width:72px;height:72px}
-.cover .big.diamond{transform:rotate(45deg) scale(.75);border-radius:8px}
+.cover .big{width:56px;height:56px}
+.cover .big.diamond{border-radius:8px}
 .cover h1{font-size:46px}
 .cover .primary{width:100%;padding:16px;font-size:16px}
+.filebtn{display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.mapopt{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left}
+.mapopt span{font-size:12px;color:var(--muted);font-weight:400}
+.seg button[aria-pressed="true"] .mapopt span{color:var(--ink);opacity:.75}
 </style>
 </head>
 <body>
 <div id="app">
   <header class="top">
-    <div class="brand"><b>Shadow Trail</b><span>Port Veyra · after midnight</span></div>
-    <div class="top-right">
-      <div class="status" id="status"></div>
-      <button class="ghost-btn" data-act="rules" type="button">Rules</button>
-      <button class="ghost-btn" data-act="quit" type="button" id="quitBtn">New game</button>
-    </div>
+    <div class="brand"><b>Shadow Trail</b><span id="subtitle">Port Veyra · after midnight</span></div>
+    <div class="status" id="status"></div>
+    <nav class="menu" aria-label="Game controls">
+      <button class="ghost-btn" type="button" data-act="undo" id="undoBtn">Undo</button>
+      <button class="ghost-btn" type="button" data-act="pause" id="pauseBtn">Pause</button>
+      <button class="ghost-btn" type="button" data-act="rules">Rules</button>
+      <button class="ghost-btn" type="button" data-act="end" id="endBtn">End game</button>
+      <button class="ghost-btn" type="button" data-act="menu" id="menuBtn">Menu</button>
+    </nav>
   </header>
   <main class="game">
-    <section class="board">
-      <div class="board-scroll" id="boardScroll"><svg id="map" viewBox="0 0 1000 1000" role="img" aria-label="Map of Port Veyra"></svg></div>
-      <div class="zoom"><button type="button" data-act="zoom-out" aria-label="Zoom out">−</button><button type="button" data-act="zoom-in" aria-label="Zoom in">+</button></div>
-      <div class="legend">
-        <span><i style="background:var(--cab)"></i>Taxi · street to the next crossing</span>
-        <span><i style="background:var(--tram)"></i>Bus · teal-ringed stops</span>
-        <span><i style="background:var(--metro)"></i>Train · red-ringed stations, long jumps</span>
+    <section class="board" id="board">
+      <svg id="map" viewBox="0 0 1200 1080" preserveAspectRatio="xMidYMid meet" role="img" aria-label="City map"></svg>
+      <div class="tools">
+        <button type="button" class="sym" data-act="zoom-out" aria-label="Zoom out">−</button>
+        <button type="button" class="sym" data-act="zoom-in" aria-label="Zoom in">+</button>
+        <button type="button" data-act="fit">Fit</button>
+        <button type="button" data-act="fullscreen" id="fsBtn">Full screen</button>
+      </div>
+      <div class="legend" id="legend">
+        <span><i style="background:var(--taxi)"></i>Taxi · street to the next crossing</span>
+        <span><i style="background:var(--bus)"></i>Bus · teal-ringed stops</span>
+        <span><i style="background:var(--train)"></i>Train · red-ringed stations</span>
         <span><i style="background:repeating-linear-gradient(90deg,var(--smoke) 0 6px,transparent 6px 10px)"></i>Ferry · Smoke tickets only</span>
       </div>
     </section>
-    <aside class="panel" id="panel"></aside>
+    <aside class="panel" id="panel" aria-live="polite"></aside>
   </main>
 </div>
 
 <div class="overlay dim" id="setup" hidden></div>
 <div class="overlay solid" id="cover" hidden></div>
+<div class="overlay solid" id="pause" hidden></div>
 <div class="overlay dim" id="modal" hidden></div>
 
 <script>
 (function(){
 'use strict';
+
+/* =====================================================================
+   Utilities
+   ===================================================================== */
 const $ = s => document.querySelector(s);
 const NS = 'http://www.w3.org/2000/svg';
-const COLS = 8, ROWS = 8, BRIDGES = [1, 4, 6];
-const MOVES_TOTAL = 22, REVEALS = [3, 8, 13, 18, 22];
-const T_ORDER = ['cab', 'tram', 'metro', 'smoke'];
-const T_LABEL = {cab:'Taxi', tram:'Bus', metro:'Train', smoke:'Smoke', ferry:'Ferry', sprint:'Sprint'};
-const T_SHORT = {cab:'TAXI', tram:'BUS', metro:'TRN', smoke:'SMK'};
-const AGENT_COLORS = ['#5cb8ff', '#ff7ac0', '#b4e468', '#e8edf6'];
-const AGENT_DEFAULTS = ['Harrow', 'Quill', 'Marlow', 'Vance'];
-const SAVE_KEY = 'shadow-trail-v1';
-const nid = (r, c) => r * COLS + c + 1;
-
+const clone = o => JSON.parse(JSON.stringify(o));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const isNarrow = () => window.matchMedia('(max-width: 900px)').matches;
 function rng(seed){ return () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-const riverY = x => 500 + 16 * Math.sin(x / 140 + 0.8);
+function mk(tag, attrs, parent){ const e = document.createElementNS(NS, tag); for (const k in attrs) if (attrs[k] != null) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
 
-/* ---------- The city: fixed layout, same every game ---------- */
-function buildCity(){
-  const rnd = rng(7319);
-  const nodes = [];
-  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++){
-    let x = 80 + c * 120 + (rnd() - .5) * 56;
-    let y = 80 + r * 120 + (rnd() - .5) * 46;
-    if (r === 3) y = 434 - rnd() * 24;
-    if (r === 4) y = 566 + rnd() * 24;
-    nodes[nid(r, c)] = {id:nid(r, c), r, c, x:Math.round(x), y:Math.round(y)};
+const TK = {
+  taxi:{label:'Taxi', short:'TAXI'}, bus:{label:'Bus', short:'BUS'}, train:{label:'Train', short:'TRN'},
+  smoke:{label:'Smoke', short:'SMK'}, ferry:{label:'Ferry', short:'FRY'}, double:{label:'Double move', short:'2X'}
+};
+const MOVE_KINDS = ['taxi', 'bus', 'train'];
+const EDGE_KINDS = ['taxi', 'bus', 'train', 'ferry'];
+const AGENT_COLORS = ['#5cb8ff', '#ff7ac0', '#b4e468', '#e8edf6', '#d9a873'];
+const AGENT_DEFAULTS = ['Harrow', 'Quill', 'Marlow', 'Vance', 'Ostrow'];
+const KEYS = {game:'shadow-trail-game-v2', setup:'shadow-trail-setup-v2', map:'shadow-trail-map-v1'};
+
+/* StorageManager: localStorage for game and settings, IndexedDB for a map's background picture */
+const Store = {
+  get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } },
+  db:null,
+  open(){
+    if (this.db) return Promise.resolve(this.db);
+    return new Promise(res => {
+      try {
+        const r = indexedDB.open('shadow-trail', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('assets');
+        r.onsuccess = () => { this.db = r.result; res(this.db); };
+        r.onerror = () => res(null);
+      } catch (e) { res(null); }
+    });
+  },
+  async getAsset(k){
+    const db = await this.open(); if (!db) return null;
+    return new Promise(res => { try { const q = db.transaction('assets').objectStore('assets').get(k); q.onsuccess = () => res(q.result ?? null); q.onerror = () => res(null); } catch (e) { res(null); } });
+  },
+  async setAsset(k, v){
+    const db = await this.open(); if (!db) return false;
+    return new Promise(res => { try { const tx = db.transaction('assets', 'readwrite'); const st = tx.objectStore('assets'); if (v == null) st.delete(k); else st.put(v, k); tx.oncomplete = () => res(true); tx.onerror = () => res(false); } catch (e) { res(false); } });
   }
-  const cab = [], diagCells = new Set();
+};
+
+/* Sound: short synthesized tones, only after a player has interacted */
+const Sound = {
+  ctx:null,
+  on(){ return state ? state.cfg.sound : setupCfg.sound; },
+  tone(f, dur = .09, type = 'triangle', vol = .06, delay = 0){
+    if (!this.on()) return;
+    try {
+      this.ctx = this.ctx || new (window.AudioContext || window.webkitAudioContext)();
+      const c = this.ctx, o = c.createOscillator(), g = c.createGain(), t = c.currentTime + delay;
+      o.type = type; o.frequency.value = f;
+      g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .01); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+      o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + .03);
+    } catch (e) {}
+  },
+  move(){ this.tone(520); },
+  reveal(){ this.tone(392, .16, 'sine', .07); this.tone(587, .22, 'sine', .07, .13); },
+  win(){ [523, 659, 784].forEach((f, i) => this.tone(f, .22, 'sine', .07, i * .13)); },
+  lose(){ [392, 330, 262].forEach((f, i) => this.tone(f, .24, 'sine', .07, i * .15)); }
+};
+
+/* =====================================================================
+   MapEngine: map data, graph, validation
+   Map format (JSON):
+   { name, w, h, nodes:[{id, x, y}] with x,y normalised 0..1,
+     edges:[{a, b, t}] t in taxi|bus|train|ferry, starts:[id], style:{lines, labels, size} }
+   Only listed crossings are playable. Links are undirected: a to b can be travelled both ways.
+   ===================================================================== */
+const veylY = x => 600 + 16 * Math.sin(x / 150 + .8);
+function buildPortVeyra(){
+  const COLS = 10, ROWS = 9, RIVER = 4, BRIDGES = [1, 4, 7], W = 1200, H = 1080;
+  const id = (r, c) => r * COLS + c + 1;
+  const rnd = rng(7319);
+  const P = [];
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++){
-    if (c < COLS - 1) cab.push({a:nid(r, c), b:nid(r, c + 1), t:'cab', ortho:true});
-    if (r < ROWS - 1 && (r !== 3 || BRIDGES.includes(c))) cab.push({a:nid(r, c), b:nid(r + 1, c), t:'cab', ortho:true, bridge:r === 3});
+    let x = 60 + c * 120 + (rnd() - .5) * 56;
+    let y = 60 + r * 120 + (rnd() - .5) * 46;
+    if (r === RIVER) y = 532 - rnd() * 22;
+    if (r === RIVER + 1) y = 668 + rnd() * 22;
+    P[id(r, c)] = {id:id(r, c), r, c, x:Math.round(x), y:Math.round(y)};
+  }
+  const taxi = [], diag = new Set();
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++){
+    if (c < COLS - 1) taxi.push({a:id(r, c), b:id(r, c + 1), ortho:true});
+    if (r < ROWS - 1 && (r !== RIVER || BRIDGES.includes(c))) taxi.push({a:id(r, c), b:id(r + 1, c), ortho:true, bridge:r === RIVER});
   }
   for (let r = 0; r < ROWS - 1; r++) for (let c = 0; c < COLS - 1; c++){
-    if (r === 3) continue;
-    if (rnd() < 0.3){
-      diagCells.add(r + ',' + c);
-      if (rnd() < .5) cab.push({a:nid(r, c), b:nid(r + 1, c + 1), t:'cab'});
-      else cab.push({a:nid(r, c + 1), b:nid(r + 1, c), t:'cab'});
+    if (r === RIVER) continue;
+    if (rnd() < .3){
+      diag.add(r + ',' + c);
+      if (rnd() < .5) taxi.push({a:id(r, c), b:id(r + 1, c + 1)}); else taxi.push({a:id(r, c + 1), b:id(r + 1, c)});
     }
   }
-  const alive = new Set(cab);
+  const alive = new Set(taxi);
   const deg = n => { let d = 0; alive.forEach(e => { if (e.a === n || e.b === n) d++; }); return d; };
   const connected = () => {
     const adj = {}; alive.forEach(e => { (adj[e.a] = adj[e.a] || []).push(e.b); (adj[e.b] = adj[e.b] || []).push(e.a); });
@@ -261,509 +386,1143 @@ function buildCity(){
     while (q.length){ const n = q.pop(); for (const m of adj[n] || []) if (!seen.has(m)){ seen.add(m); q.push(m); } }
     return seen.size === ROWS * COLS;
   };
-  const order = cab.filter(e => e.ortho && !e.bridge).map(e => [rnd(), e]).sort((p, q) => p[0] - q[0]).map(p => p[1]);
+  const order = taxi.filter(e => e.ortho && !e.bridge).map(e => [rnd(), e]).sort((p, q) => p[0] - q[0]).map(p => p[1]);
   let removed = 0;
   for (const e of order){
-    if (removed >= 18) break;
+    if (removed >= 24) break;
     if (deg(e.a) <= 2 || deg(e.b) <= 2) continue;
     alive.delete(e);
     if (connected()) removed++; else alive.add(e);
   }
-  const edges = [...alive];
-  const P = (r, c) => nid(r, c);
-  const route = (pts, t) => { for (let i = 1; i < pts.length; i++) edges.push({a:P(...pts[i - 1]), b:P(...pts[i]), t}); };
-  // Tram lines
-  route([[2,0],[1,1],[1,3],[0,4],[1,5],[2,6],[1,7]], 'tram');
-  route([[3,1],[3,3],[3,5],[3,7]], 'tram');
-  route([[4,0],[4,2],[4,4],[5,6],[4,7]], 'tram');
-  route([[5,0],[6,1],[6,3],[7,4],[6,6]], 'tram');
-  route([[0,0],[2,0],[4,0],[6,1]], 'tram');
-  route([[1,3],[3,3],[4,2],[6,3]], 'tram');
-  route([[1,5],[3,5],[4,4],[6,5],[7,7]], 'tram');
-  route([[1,7],[3,7],[5,7],[6,6]], 'tram');
-  // Metro
-  [[[1,1],[3,3]],[[3,3],[4,4]],[[4,4],[5,6]],[[2,6],[4,4]],[[4,4],[6,1]],[[0,4],[3,3]],[[0,4],[1,1]],[[0,4],[2,6]],
-   [[4,0],[1,1]],[[4,0],[6,1]],[[6,1],[7,4]],[[7,4],[5,6]],[[5,6],[3,7]],[[3,7],[2,6]]].forEach(([a, b]) => edges.push({a:P(...a), b:P(...b), t:'metro'}));
-  // Ferry along the river
-  route([[3,0],[4,2],[3,5],[4,7]], 'ferry');
-
-  const adj = {}, kinds = {};
-  for (const n of nodes) if (n){ adj[n.id] = []; kinds[n.id] = new Set(); }
-  for (const e of edges){
-    adj[e.a].push({to:e.b, t:e.t}); adj[e.b].push({to:e.a, t:e.t});
-    kinds[e.a].add(e.t); kinds[e.b].add(e.t);
+  const edges = [...alive].map(e => ({a:e.a, b:e.b, t:'taxi'}));
+  const add = (pts, t) => { for (let i = 1; i < pts.length; i++) edges.push({a:id(...pts[i - 1]), b:id(...pts[i]), t}); };
+  // Bus: four cross-town lines and five zig-zag lines that link them
+  add([[1,0],[1,2],[1,4],[1,6],[1,8]], 'bus');
+  add([[3,1],[3,3],[3,5],[3,7],[3,9]], 'bus');
+  add([[5,0],[5,2],[5,4],[5,6],[5,8]], 'bus');
+  add([[7,1],[7,3],[7,5],[7,7],[7,9]], 'bus');
+  for (let k = 0; k < 5; k++) add([[1,2*k],[3,2*k+1],[5,2*k],[7,2*k+1]], 'bus');
+  // Train: long jumps between nine stations
+  [[[1,0],[1,4]],[[1,4],[1,8]],[[1,4],[3,5]],[[3,5],[5,2]],[[3,5],[5,6]],[[1,0],[5,2]],[[1,8],[5,6]],
+   [[5,2],[7,1]],[[5,6],[7,5]],[[7,1],[7,5]],[[7,5],[7,9]],[[5,6],[7,9]],[[1,8],[7,9]]].forEach(([a, b]) => edges.push({a:id(...a), b:id(...b), t:'train'}));
+  // Ferry along the river (Smoke tickets only)
+  add([[4,0],[5,3],[4,6],[5,9]], 'ferry');
+  const starts = [[0,2],[0,6],[0,9],[1,3],[2,0],[2,5],[2,8],[3,2],[4,4],[4,8],[5,1],[5,5],[6,3],[6,7],[6,9],[7,4],[8,1],[8,6]].map(p => id(...p));
+  const blocks = [];
+  const brnd = rng(99);
+  for (let r = 0; r < ROWS - 1; r++) for (let c = 0; c < COLS - 1; c++){
+    if (r === RIVER || diag.has(r + ',' + c)) continue;
+    const q = [P[id(r, c)], P[id(r, c + 1)], P[id(r + 1, c + 1)], P[id(r + 1, c)]];
+    const mx = q.reduce((s, p) => s + p.x, 0) / 4, my = q.reduce((s, p) => s + p.y, 0) / 4;
+    blocks.push({p:q.map(p => `${(mx + (p.x - mx) * .62).toFixed(1)},${(my + (p.y - my) * .62).toFixed(1)}`).join(' '), park:brnd() < .14});
   }
-  return {nodes, edges, adj, kinds, diagCells};
-}
-const CITY = buildCity();
-const START_POOL = [[0,1],[0,6],[1,3],[2,0],[2,5],[2,7],[3,2],[4,1],[4,5],[5,3],[5,7],[6,0],[6,4],[7,2],[7,6],[1,5]].map(p => nid(...p));
-
-/* ---------- State ---------- */
-let state = null;          // the game
-let screen = 'setup';      // 'setup' | 'game'
-let zoom = 1;
-let showSuspects = true;
-let setupCfg = {shadowName:'Shadow', count:3, names:AGENT_DEFAULTS.slice(), tracker:true};
-
-function save(){ try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {} }
-function load(){ try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && s.v === 1) return s; } catch (e) {} return null; }
-const shuffle = a => { for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-const esc = s => String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-
-function newGame(cfg){
-  const pool = shuffle(START_POOL.slice());
-  const agents = cfg.names.slice(0, cfg.count).map((name, i) => ({
-    name:(name || '').trim() || AGENT_DEFAULTS[i], color:AGENT_COLORS[i], pos:pool[i + 1], tickets:{cab:10, tram:8, metro:4}
-  }));
-  state = {
-    v:1, shadowName:(cfg.shadowName || '').trim() || 'Shadow', agents,
-    shadow:{pos:pool[0], tickets:{cab:4, tram:3, metro:3, smoke:agents.length + 1, sprint:2}},
-    shadowStart:pool[0], log:[], phase:'shadow', view:'cover-shadow', turnAgent:0,
-    mode:null, sprint:{active:false, step:0}, shadowDone:false, turnMoves:[], tracker:cfg.tracker,
-    suspects:START_POOL.filter(n => !agents.some(a => a.pos === n)), lastReveal:null, spottedFresh:false,
-    roundMoved:false, selected:null, winner:null, reason:'', trails:agents.map(a => [a.pos])
+  let river = '';
+  for (let x = -40; x <= W + 40; x += 20) river += (x === -40 ? 'M' : 'L') + x + ' ' + veylY(x).toFixed(1);
+  return {
+    v:1, name:'Port Veyra', builtin:true, w:W, h:H,
+    nodes:P.filter(Boolean).map(n => ({id:n.id, x:+(n.x / W).toFixed(5), y:+(n.y / H).toFixed(5)})),
+    edges, starts, decor:{blocks, river}, style:{lines:true, labels:true, size:19}
   };
-  screen = 'game';
-  save(); render();
 }
 
+function prepare(raw){
+  const m = Object.assign({}, raw);
+  m.style = Object.assign({lines:true, labels:true, size:16}, raw.style || {});
+  m.nodes = (raw.nodes || []).map(n => ({id:n.id, x:n.x, y:n.y, px:n.x * raw.w, py:n.y * raw.h}));
+  m.byId = new Map(m.nodes.map(n => [n.id, n]));
+  m.adj = new Map(m.nodes.map(n => [n.id, []]));
+  m.kinds = new Map(m.nodes.map(n => [n.id, new Set()]));
+  m.edges = [];
+  const seen = new Set();
+  for (const e of raw.edges || []){
+    if (!m.byId.has(e.a) || !m.byId.has(e.b) || e.a === e.b || !EDGE_KINDS.includes(e.t)) continue;
+    const k = Math.min(e.a, e.b) + '-' + Math.max(e.a, e.b) + '-' + e.t;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    m.edges.push({a:e.a, b:e.b, t:e.t});
+    m.adj.get(e.a).push({to:e.b, t:e.t}); m.adj.get(e.b).push({to:e.a, t:e.t});
+    m.kinds.get(e.a).add(e.t); m.kinds.get(e.b).add(e.t);
+  }
+  m.starts = (raw.starts || []).filter(id => m.byId.has(id));
+  return m;
+}
+
+function validateMap(raw, players){
+  const errors = [], warnings = [];
+  const nodes = raw.nodes || [], edges = raw.edges || [];
+  const ids = new Set();
+  for (const n of nodes){
+    if (!Number.isInteger(n.id) || n.id < 1) errors.push(`A crossing has the number "${n.id}". Numbers must be whole numbers from 1 up.`);
+    else if (ids.has(n.id)) errors.push(`Crossing number ${n.id} is used twice.`);
+    ids.add(n.id);
+    if (!(n.x >= 0 && n.x <= 1 && n.y >= 0 && n.y <= 1)) errors.push(`Crossing ${n.id} is placed outside the map.`);
+  }
+  if (nodes.length < 6) errors.push(`The map has ${nodes.length} crossing${nodes.length === 1 ? '' : 's'}. It needs at least 6.`);
+  const seen = new Set(), deg = new Map(), walk = new Map();
+  nodes.forEach(n => { deg.set(n.id, 0); walk.set(n.id, []); });
+  for (const e of edges){
+    if (!EDGE_KINDS.includes(e.t)){ errors.push(`A link between ${e.a} and ${e.b} has an unknown transport "${e.t}".`); continue; }
+    if (!ids.has(e.a) || !ids.has(e.b)){ errors.push(`A ${TK[e.t].label} link points to crossing ${!ids.has(e.a) ? e.a : e.b}, which does not exist.`); continue; }
+    if (e.a === e.b){ errors.push(`Crossing ${e.a} has a ${TK[e.t].label} link to itself.`); continue; }
+    const k = Math.min(e.a, e.b) + '-' + Math.max(e.a, e.b) + '-' + e.t;
+    if (seen.has(k)) warnings.push(`The ${TK[e.t].label} link ${e.a}–${e.b} is listed twice. The copy is ignored.`);
+    seen.add(k);
+    deg.set(e.a, deg.get(e.a) + 1); deg.set(e.b, deg.get(e.b) + 1);
+    if (e.t !== 'ferry'){ walk.get(e.a).push(e.b); walk.get(e.b).push(e.a); }
+  }
+  const lonely = nodes.filter(n => deg.get(n.id) === 0).map(n => n.id);
+  if (lonely.length) warnings.push(`No links at crossing${lonely.length > 1 ? 's' : ''} ${lonely.slice(0, 12).join(', ')}${lonely.length > 12 ? '…' : ''}. Nobody can move to or from ${lonely.length > 1 ? 'them' : 'it'}.`);
+  if (nodes.length && !errors.length){
+    const first = nodes[0].id, s = new Set([first]), q = [first];
+    while (q.length){ const n = q.pop(); for (const m of walk.get(n) || []) if (!s.has(m)){ s.add(m); q.push(m); } }
+    if (s.size < nodes.length) warnings.push(`${nodes.length - s.size} crossing${nodes.length - s.size === 1 ? ' is' : 's are'} cut off from crossing ${first} by Taxi, Bus and Train.`);
+  }
+  const starts = raw.starts || [];
+  const badStarts = starts.filter(id => !ids.has(id));
+  if (badStarts.length) errors.push(`Starting spot${badStarts.length > 1 ? 's' : ''} ${badStarts.join(', ')} ${badStarts.length > 1 ? 'are' : 'is'} not on the map.`);
+  if (players && starts.length < players) warnings.push(`Only ${starts.length} starting spot${starts.length === 1 ? '' : 's'} for ${players} players, so every crossing can be used as a start.`);
+  if (players && nodes.length < players) errors.push(`The map has fewer crossings than players.`);
+  return {errors, warnings};
+}
+
+const BUILTIN_RAW = buildPortVeyra();
+const BUILTIN = prepare(BUILTIN_RAW);
+let customRaw = Store.get(KEYS.map);
+let customImage = null;
+
+/* =====================================================================
+   Settings and game state
+   ===================================================================== */
+const DEFAULT_CFG = {
+  shadowName:'Shadow', agentCount:3, agentNames:AGENT_DEFAULTS.slice(), placement:'random', map:'builtin',
+  tickets:{taxi:20, bus:10, train:5}, smoke:5, doubles:2, doubleOn:true, turns:24, revealsText:'3, 8, 13, 18, 24',
+  tracker:true, sound:true, motion:true
+};
+let setupCfg = Object.assign(clone(DEFAULT_CFG), Store.get(KEYS.setup) || {});
+setupCfg.tickets = Object.assign({}, DEFAULT_CFG.tickets, setupCfg.tickets || {});
+if (!Array.isArray(setupCfg.agentNames) || setupCfg.agentNames.length < 5) setupCfg.agentNames = AGENT_DEFAULTS.slice();
+
+let state = null;           // the whole game, including private information
+let screen = 'setup';       // setup | game | editor
+let history = [];           // undo snapshots: {side, snap}
+const ui = {mode:null, selected:null, inspect:null, paused:false, showSuspects:true, replay:null, playing:null, setupErr:''};
+const resetUi = () => { ui.mode = null; ui.selected = null; ui.inspect = null; };
+
+function saveGame(){ if (state) Store.set(KEYS.game, state); }
+function loadGame(){ const s = Store.get(KEYS.game); return s && s.v === 2 ? s : null; }
+
+let mapCache = {src:null, img:null, m:null};
+function MAP(){
+  if (screen === 'editor') return Editor.prepared;
+  if (!state || state.mapKey !== 'custom') return BUILTIN;
+  if (mapCache.src !== state.mapData || mapCache.img !== customImage)
+    mapCache = {src:state.mapData, img:customImage, m:prepare(Object.assign({}, state.mapData, {image:customImage}))};
+  return mapCache.m;
+}
+
+function parseReveals(text, turns){
+  const parts = String(text || '').split(/[\s,;]+/).filter(Boolean);
+  const list = [];
+  for (const p of parts){
+    const n = Number(p);
+    if (!Number.isInteger(n) || n < 1 || n > turns) return {error:`Sighting turns must be whole numbers between 1 and ${turns}. "${p}" is not.`};
+    if (!list.includes(n)) list.push(n);
+  }
+  return {list:list.sort((a, b) => a - b)};
+}
+
+/* PlayerManager + TurnManager */
+function newGame(cfg){
+  const raw = cfg.map === 'custom' && customRaw ? customRaw : BUILTIN_RAW;
+  const players = cfg.agentCount + 1;
+  const v = validateMap(raw, players);
+  if (v.errors.length){ ui.setupErr = 'The map has problems: ' + v.errors.join(' '); renderSetup(); return; }
+  const m = prepare(raw);
+  const pool = m.starts.length >= players ? m.starts.slice() : m.nodes.map(n => n.id);
+  state = {
+    v:2, cfg:clone(cfg), mapKey:cfg.map === 'custom' ? 'custom' : 'builtin', mapData:cfg.map === 'custom' ? clone(customRaw) : null,
+    shadow:{name:(cfg.shadowName || '').trim() || 'Shadow', pos:null, start:null,
+      tickets:Object.assign({}, cfg.tickets, {smoke:cfg.smoke, double:cfg.doubleOn ? cfg.doubles : 0})},
+    agents:cfg.agentNames.slice(0, cfg.agentCount).map((n, i) => ({name:(n || '').trim() || AGENT_DEFAULTS[i], color:AGENT_COLORS[i], pos:null, start:null, tickets:Object.assign({}, cfg.tickets)})),
+    pool, log:[], events:[], phase:'place', view:'', turnAgent:0, double:{armed:false, step:0},
+    shadowDone:false, agentsDone:false, turnMoves:[], suspects:[], lastReveal:null, spottedFresh:false, roundMoved:false,
+    winner:null, reason:''
+  };
+  history = []; resetUi(); ui.replay = null; ui.setupErr = ''; ui.paused = false;
+  screen = 'game';
+  if (cfg.placement === 'random'){
+    const p = shuffle(pool.slice());
+    state.shadow.pos = state.shadow.start = p[0];
+    state.agents.forEach((a, i) => { a.pos = a.start = p[i + 1]; });
+    beginPlay(false);
+  } else {
+    state.view = 'place-agents';
+  }
+  drawnMap = null;
+  saveGame(); render();
+}
+function beginPlay(direct){
+  state.suspects = state.pool.filter(id => !state.agents.some(a => a.pos === id));
+  state.phase = 'shadow';
+  state.view = direct ? 'shadow' : 'cover-shadow';
+  if (direct && shadowOptions().size === 0) endGame('agents', `${state.shadow.name} has no way out of ${state.shadow.pos}.`);
+}
+
+/* MovementEngine */
 function shadowOptions(){
-  const blocked = new Set(state.agents.map(a => a.pos)), T = state.shadow.tickets, m = new Map();
-  for (const {to, t} of CITY.adj[state.shadow.pos]){
+  const m = MAP(), blocked = new Set(state.agents.map(a => a.pos)), T = state.shadow.tickets, out = new Map();
+  for (const {to, t} of m.adj.get(state.shadow.pos) || []){
     if (blocked.has(to)) continue;
-    const s = m.get(to) || new Set();
+    const s = out.get(to) || new Set();
     if (t !== 'ferry' && T[t] > 0) s.add(t);
     if (T.smoke > 0) s.add('smoke');
-    if (s.size) m.set(to, s);
+    if (s.size) out.set(to, s);
   }
-  return m;
+  return out;
 }
 function agentOptions(i){
-  const a = state.agents[i], m = new Map();
+  const m = MAP(), a = state.agents[i], out = new Map();
   const blocked = new Set(state.agents.filter((_, j) => j !== i).map(x => x.pos));
-  for (const {to, t} of CITY.adj[a.pos]){
+  for (const {to, t} of m.adj.get(a.pos) || []){
     if (blocked.has(to) || t === 'ferry' || !(a.tickets[t] > 0)) continue;
-    const s = m.get(to) || new Set(); s.add(t); m.set(to, s);
+    const s = out.get(to) || new Set(); s.add(t); out.set(to, s);
   }
-  return m;
+  return out;
 }
 function currentOptions(){
+  if (!state || ui.paused || screen !== 'game') return new Map();
   if (state.view === 'shadow' && !state.shadowDone) return shadowOptions();
-  if (state.view === 'agents') return agentOptions(state.turnAgent);
+  if (state.view === 'agents' && !state.agentsDone) return agentOptions(state.turnAgent);
   return new Map();
 }
+function placeOptions(){
+  if (!state) return [];
+  const taken = new Set(state.agents.map(a => a.pos).filter(p => p != null));
+  if (state.view === 'place-agents' || state.view === 'place-shadow') return state.pool.filter(id => !taken.has(id));
+  return [];
+}
 
+/* Hidden movement */
 function updateSuspects(ticket, revealed){
   if (revealed != null){ state.suspects = [revealed]; return; }
-  const blocked = new Set(state.agents.map(a => a.pos)), out = new Set();
-  for (const n of state.suspects) for (const {to, t} of CITY.adj[n]){
+  const m = MAP(), blocked = new Set(state.agents.map(a => a.pos)), out = new Set();
+  for (const n of state.suspects) for (const {to, t} of m.adj.get(n) || []){
     if (blocked.has(to)) continue;
     if (ticket === 'smoke' || t === ticket) out.add(to);
   }
   state.suspects = [...out];
 }
+/* GameHistory: undo snapshots of the complete state */
+function pushHistory(side){ history.push({side, snap:JSON.stringify(state)}); if (history.length > 80) history.shift(); }
+function canUndo(){
+  const top = history[history.length - 1];
+  if (!top || !state || screen !== 'game' || ui.paused) return false;
+  return (top.side === 'shadow' && state.view === 'shadow') || (top.side === 'agents' && state.view === 'agents');
+}
+function undo(){
+  if (!canUndo()) return;
+  state = JSON.parse(history.pop().snap);
+  resetUi(); saveGame(); render();
+}
 
-function doShadowMove(to, ticket){
-  const moveNo = state.log.length + 1, reveal = REVEALS.includes(moveNo);
-  if (state.sprint.active && state.sprint.step === 1) state.shadow.tickets.sprint--;
-  state.shadow.tickets[ticket]--;
+function commitMove(){
+  const to = ui.selected, t = ui.mode;
+  const opts = currentOptions();
+  if (!to || !t || !opts.has(to) || !opts.get(to).has(t)) return;
+  if (state.view === 'shadow') doShadowMove(to, t); else if (state.view === 'agents') doAgentMove(to, t);
+}
+function doShadowMove(to, t){
+  pushHistory('shadow');
+  const turn = state.log.length + 1, reveal = state.cfg.reveals.includes(turn), from = state.shadow.pos;
+  if (state.double.armed && state.double.step === 1) state.shadow.tickets.double--;
+  state.shadow.tickets[t]--;
   state.shadow.pos = to;
-  state.log.push({ticket, node:to, reveal});
-  state.turnMoves.push({ticket, node:to, reveal, move:moveNo});
-  updateSuspects(ticket, reveal ? to : null);
-  if (reveal){ state.lastReveal = {node:to, move:moveNo}; state.spottedFresh = true; }
-  state.selected = null; state.mode = null;
-  if (state.sprint.active && state.sprint.step === 1 && state.log.length < MOVES_TOTAL && shadowOptions().size){
-    state.sprint.step = 2;
+  state.log.push({turn, ticket:t, from, node:to, reveal});
+  state.events.push({k:'s', from, to, t, turn});
+  state.turnMoves.push({turn, ticket:t, from, node:to, reveal});
+  updateSuspects(t, reveal ? to : null);
+  if (reveal){ state.lastReveal = {node:to, turn}; state.spottedFresh = true; }
+  if (state.double.armed && state.double.step === 1 && state.log.length < state.cfg.turns && shadowOptions().size){
+    state.double.step = 2;
   } else {
-    state.sprint = {active:false, step:0};
+    state.double = {armed:false, step:0};
     state.shadowDone = true;
   }
-  save(); render();
+  Sound.move(); resetUi(); saveGame(); render();
 }
-
-function doAgentMove(to, ticket){
-  const i = state.turnAgent, a = state.agents[i];
-  a.tickets[ticket]--; state.shadow.tickets[ticket]++;
-  a.pos = to; state.trails[i].push(to); state.roundMoved = true; state.selected = null; state.mode = null;
-  if (to === state.shadow.pos){ endGame('agents', `${a.name} walked into crossing ${to} and caught the Shadow.`); return; }
+function doAgentMove(to, t){
+  pushHistory('agents');
+  const i = state.turnAgent, a = state.agents[i], from = a.pos;
+  a.tickets[t]--; a.pos = to; state.roundMoved = true;
+  state.events.push({k:'a', i, from, to, t, turn:state.log.length});
+  resetUi();
+  if (to === state.shadow.pos){ endGame('agents', `${a.name} moved onto crossing ${to} and caught ${state.shadow.name}.`); return; }
   state.suspects = state.suspects.filter(n => n !== to);
-  nextAgent();
+  Sound.move();
+  advanceAgent();
 }
-function nextAgent(){
+function advanceAgent(){
   state.turnAgent++;
-  state.selected = null; state.mode = null;
-  if (state.turnAgent >= state.agents.length) endRound();
-  else { save(); render(); centerOn(state.agents[state.turnAgent].pos); }
+  if (state.turnAgent >= state.agents.length){ state.turnAgent = state.agents.length - 1; state.agentsDone = true; }
+  saveGame(); render();
+  if (!state.agentsDone) View.centerOn(state.agents[state.turnAgent].pos);
 }
 function endRound(){
-  if (!state.roundMoved) return endGame('shadow', 'None of the agents could make a move, so the Shadow slipped away.');
-  if (state.log.length >= MOVES_TOTAL) return endGame('shadow', `The Shadow stayed loose for all ${MOVES_TOTAL} turns.`);
-  if (shadowOptions().size === 0) return endGame('agents', `The Shadow is cornered at ${state.shadow.pos} with nowhere left to go.`);
+  if (!state.roundMoved) return endGame('shadow', `None of the agents could move, so ${state.shadow.name} slipped away.`);
+  if (state.log.length >= state.cfg.turns) return endGame('shadow', `${state.shadow.name} stayed free for all ${state.cfg.turns} turns.`);
+  if (shadowOptions().size === 0) return endGame('agents', `${state.shadow.name} is cornered at ${state.shadow.pos} with no way out.`);
   state.phase = 'shadow'; state.view = 'cover-shadow';
-  state.shadowDone = false; state.turnMoves = []; state.spottedFresh = false; state.roundMoved = false; state.turnAgent = 0;
-  save(); render();
+  state.shadowDone = false; state.agentsDone = false; state.turnMoves = []; state.spottedFresh = false; state.roundMoved = false; state.turnAgent = 0;
+  history = [];
+  resetUi(); saveGame(); render();
 }
+/* GameRules: end states */
 function endGame(winner, reason){
-  state.phase = 'over'; state.view = 'end'; state.winner = winner; state.reason = reason; state.selected = null; state.mode = null;
-  save(); render();
+  state.phase = 'over'; state.view = 'end'; state.winner = winner; state.reason = reason;
+  history = []; resetUi(); ui.replay = state.events.length; ui.paused = false;
+  if (winner === 'agents') Sound.win(); else if (winner === 'shadow') Sound.lose();
+  saveGame(); render();
 }
 
-/* ---------- Map drawing ---------- */
+/* PrivacyManager: the renderer only reads this view model.
+   On public screens the Shadow's position, start and hidden route are left out entirely, not hidden with CSS. */
+const PRIVATE_VIEWS = ['shadow', 'place-shadow', 'end'];
+function viewModel(){
+  const priv = PRIVATE_VIEWS.includes(state.view);
+  const s = state.shadow;
+  return {
+    priv,
+    shadow:priv ? {name:s.name, pos:s.pos, start:s.start, tickets:Object.assign({}, s.tickets)} : {name:s.name, pos:null, start:null, tickets:{smoke:s.tickets.smoke, double:s.tickets.double}},
+    agents:state.agents.map(a => ({name:a.name, color:a.color, pos:a.pos, start:a.start, tickets:Object.assign({}, a.tickets)})),
+    log:state.log.map(e => priv ? Object.assign({}, e) : {turn:e.turn, ticket:e.ticket, reveal:e.reveal, node:e.reveal ? e.node : null, from:null}),
+    agentEvents:state.events.filter(e => e.k === 'a'),
+    events:priv ? state.events : null,
+    lastReveal:state.lastReveal, suspects:state.suspects
+  };
+}
+
+/* =====================================================================
+   UIRenderer: map
+   ===================================================================== */
 const svg = $('#map');
-function mk(tag, attrs, parent){ const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
-function edgePath(a, b, off){
-  const A = CITY.nodes[a], B = CITY.nodes[b];
-  if (!off) return `M${A.x} ${A.y}L${B.x} ${B.y}`;
-  const dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy);
-  const cx = (A.x + B.x) / 2 - dy / L * off, cy = (A.y + B.y) / 2 + dx / L * off;
-  return `M${A.x} ${A.y}Q${cx.toFixed(1)} ${cy.toFixed(1)} ${B.x} ${B.y}`;
-}
 const L = {};
-function drawStatic(){
-  const rnd = rng(99);
-  const g = mk('g', {}, svg);
-  mk('rect', {x:0, y:0, width:1000, height:1000, fill:'var(--ground)'}, g);
-  for (let r = 0; r < ROWS - 1; r++) for (let c = 0; c < COLS - 1; c++){
-    if (r === 3 || CITY.diagCells.has(r + ',' + c)) continue;
-    const q = [CITY.nodes[nid(r, c)], CITY.nodes[nid(r, c + 1)], CITY.nodes[nid(r + 1, c + 1)], CITY.nodes[nid(r + 1, c)]];
-    const mx = q.reduce((s, p) => s + p.x, 0) / 4, my = q.reduce((s, p) => s + p.y, 0) / 4;
-    const pts = q.map(p => `${(mx + (p.x - mx) * .62).toFixed(1)},${(my + (p.y - my) * .62).toFixed(1)}`).join(' ');
-    mk('polygon', {points:pts, class:'blk' + (rnd() < .14 ? ' park' : ''), rx:8}, g);
-  }
-  let d = '';
-  for (let x = -40; x <= 1040; x += 20) d += (x === -40 ? 'M' : 'L') + x + ' ' + riverY(x).toFixed(1);
-  mk('path', {d, class:'river-edge', id:'riverPath'}, g);
-  mk('path', {d, class:'river'}, g);
-  const label = mk('text', {class:'river-name', dy:5}, g);
-  const tp = mk('textPath', {href:'#riverPath', startOffset:'30%'}, label); tp.textContent = 'RIVER VEYL';
+['base', 'suspects', 'route', 'hl', 'tokens', 'edit', 'hit'].forEach(k => { L[k] = mk('g', {}, svg); });
+let drawnMap = null;
 
-  const eg = mk('g', {}, svg);
-  for (const e of CITY.edges) if (e.t === 'cab' && e.a + COLS === e.b && CITY.nodes[e.a].r === 3) mk('path', {d:edgePath(e.a, e.b), class:'e e-casing'}, eg);
-  for (const e of CITY.edges) if (e.t === 'cab') mk('path', {d:edgePath(e.a, e.b), class:'e e-cab'}, eg);
-  for (const e of CITY.edges) if (e.t === 'tram') mk('path', {d:edgePath(e.a, e.b, 16), class:'e e-tram'}, eg);
-  for (const e of CITY.edges) if (e.t === 'metro') mk('path', {d:edgePath(e.a, e.b, -26), class:'e e-metro'}, eg);
-  for (const e of CITY.edges) if (e.t === 'ferry'){
-    const A = CITY.nodes[e.a], B = CITY.nodes[e.b], mx = (A.x + B.x) / 2;
-    mk('path', {d:`M${A.x} ${A.y}Q${mx} ${riverY(mx).toFixed(1)} ${B.x} ${B.y}`, class:'e e-ferry'}, eg);
+function edgePath(m, e){
+  const A = m.byId.get(e.a), B = m.byId.get(e.b);
+  if (m.decor && e.t === 'ferry'){ const mx = (A.px + B.px) / 2; return `M${A.px} ${A.py}Q${mx} ${veylY(mx).toFixed(1)} ${B.px} ${B.py}`; }
+  const off = m.builtin ? (e.t === 'bus' ? 16 : e.t === 'train' ? -26 : 0) : 0;
+  if (!off) return `M${A.px} ${A.py}L${B.px} ${B.py}`;
+  const dx = B.px - A.px, dy = B.py - A.py, len = Math.hypot(dx, dy) || 1;
+  return `M${A.px} ${A.py}Q${((A.px + B.px) / 2 - dy / len * off).toFixed(1)} ${((A.py + B.py) / 2 + dx / len * off).toFixed(1)} ${B.px} ${B.py}`;
+}
+function drawMap(m){
+  const g = L.base; g.replaceChildren(); L.hit.replaceChildren();
+  const R = m.style.size, s = R / 19;
+  if (m.image) mk('image', {href:m.image, x:0, y:0, width:m.w, height:m.h, preserveAspectRatio:'none'}, g);
+  else mk('rect', {x:0, y:0, width:m.w, height:m.h, class:'ground'}, g);
+  if (m.decor){
+    for (const b of m.decor.blocks) mk('polygon', {points:b.p, class:'blk' + (b.park ? ' park' : '')}, g);
+    mk('path', {d:m.decor.river, class:'river-edge', id:'riverPath', 'stroke-width':64}, g);
+    mk('path', {d:m.decor.river, class:'river', 'stroke-width':58}, g);
+    const tx = mk('text', {class:'river-name', dy:5, 'font-size':15}, g);
+    mk('textPath', {href:'#riverPath', startOffset:'30%'}, tx).textContent = 'RIVER VEYL';
   }
-  L.suspects = mk('g', {}, svg);
-  const ng = mk('g', {}, svg);
-  for (const n of CITY.nodes){
-    if (!n) continue;
-    const k = CITY.kinds[n.id];
-    if (k.has('ferry')) mk('circle', {cx:n.x, cy:n.y, r:k.has('metro') ? 32 : 26, class:'n-pier'}, ng);
-    if (k.has('metro')) mk('circle', {cx:n.x, cy:n.y, r:25, class:'n-metro'}, ng);
-    mk('circle', {cx:n.x, cy:n.y, r:19, class:'n-core' + (k.has('tram') ? ' tram' : '')}, ng);
-    mk('text', {x:n.x, y:n.y + 1, class:'n-label'}, ng).textContent = n.id;
+  if (m.style.lines){
+    const eg = mk('g', {}, g);
+    if (m.decor) for (const e of m.edges) if (e.t === 'taxi'){
+      const A = m.byId.get(e.a), B = m.byId.get(e.b);
+      if ((A.py - 600) * (B.py - 600) < 0) mk('path', {d:edgePath(m, e), class:'e e-casing', 'stroke-width':15 * s}, eg);
+    }
+    const W = {taxi:3.5, bus:5, train:6, ferry:4};
+    for (const t of EDGE_KINDS) for (const e of m.edges) if (e.t === t)
+      mk('path', {d:edgePath(m, e), class:'e e-' + t, 'stroke-width':W[t] * s, 'stroke-dasharray':t === 'ferry' ? `${10 * s} ${9 * s}` : null}, eg);
   }
-  L.route = mk('g', {}, svg);
-  L.hl = mk('g', {}, svg);
-  L.tokens = mk('g', {}, svg);
-  L.hit = mk('g', {}, svg);
-  for (const n of CITY.nodes){
-    if (!n) continue;
-    const h = mk('circle', {cx:n.x, cy:n.y, r:36, class:'hit', 'data-node':n.id}, L.hit);
-    h.addEventListener('click', () => onNodeTap(n.id));
+  const ng = mk('g', {}, g);
+  for (const n of m.nodes){
+    const k = m.kinds.get(n.id);
+    if (m.style.labels){
+      if (k.has('ferry')) mk('circle', {cx:n.px, cy:n.py, r:R * (k.has('train') ? 1.68 : 1.37), class:'n-pier', 'stroke-width':3 * s, 'stroke-dasharray':`${5 * s} ${4 * s}`}, ng);
+      if (k.has('train')) mk('circle', {cx:n.px, cy:n.py, r:R * 1.32, class:'n-train', 'stroke-width':4 * s}, ng);
+      mk('circle', {cx:n.px, cy:n.py, r:R, class:'n-core' + (k.has('bus') ? ' bus' : ''), 'stroke-width':(k.has('bus') ? 4 : 3) * s}, ng);
+      mk('text', {x:n.px, y:n.py + s, class:'n-label', 'font-size':R}, ng).textContent = n.id;
+    } else {
+      mk('circle', {cx:n.px, cy:n.py, r:R, class:'n-ring', 'stroke-width':2.5 * s}, ng);
+    }
+    mk('circle', {cx:n.px, cy:n.py, r:R * 1.8, class:'hit', 'data-node':n.id}, L.hit);
   }
+  $('#legend').hidden = !m.style.lines && !!m.image;
 }
 
-function renderBoard(){
-  for (const k of ['suspects', 'route', 'hl', 'tokens']) L[k].replaceChildren();
-  if (screen !== 'game' || !state || state.view.startsWith('cover')) return;
-  const v = state.view, N = id => CITY.nodes[id];
-  const trackerOn = state.tracker && showSuspects && (v === 'agents' || v === 'shadow');
-  if (trackerOn) for (const id of state.suspects) mk('circle', {cx:N(id).x, cy:N(id).y, r:28, class:'suspect'}, L.suspects);
+/* Pan and zoom by moving the viewBox, so markers always stay on their crossings */
+const View = {
+  x:0, y:0, w:1200, h:1080, mw:1200, mh:1080,
+  apply(){ svg.setAttribute('viewBox', `${this.x.toFixed(1)} ${this.y.toFixed(1)} ${this.w.toFixed(1)} ${this.h.toFixed(1)}`); },
+  fitTo(m){ this.mw = m.w; this.mh = m.h; this.fit(); },
+  fit(){ const p = this.mw * .02; this.x = -p; this.y = -p; this.w = this.mw + 2 * p; this.h = this.mh + 2 * p; this.apply(); },
+  zoom(f, cx, cy){
+    if (cx == null){ cx = this.x + this.w / 2; cy = this.y + this.h / 2; }
+    const nw = clamp(this.w / f, this.mw / 10, this.mw * 1.3), k = nw / this.w;
+    this.x = cx - (cx - this.x) * k; this.y = cy - (cy - this.y) * k; this.w = nw; this.h *= k; this.apply();
+  },
+  centerOn(id){
+    const n = MAP().byId.get(id); if (!n) return;
+    if (isNarrow() && this.w > this.mw * .75){ const k = (this.mw / 1.8) / this.w; this.w *= k; this.h *= k; }
+    if (this.w > this.mw * .95) return;
+    this.x = n.px - this.w / 2; this.y = n.py - this.h / 2; this.apply();
+  },
+  scale(){ const r = svg.getBoundingClientRect(); return Math.max(this.w / (r.width || 1), this.h / (r.height || 1)); }
+};
+function toSvg(cx, cy){ const pt = svg.createSVGPoint(); pt.x = cx; pt.y = cy; const ctm = svg.getScreenCTM(); return ctm ? pt.matrixTransform(ctm.inverse()) : {x:0, y:0}; }
 
-  if (v === 'end'){
-    const path = [state.shadowStart, ...state.log.map(e => e.node)];
-    mk('polyline', {points:path.map(id => `${N(id).x},${N(id).y}`).join(' '), class:'route'}, L.route);
-    state.log.forEach((e, i) => {
-      const n = N(e.node);
-      mk('circle', {cx:n.x + 24, cy:n.y - 24, r:11, class:'route-dot'}, L.route);
-      mk('text', {x:n.x + 24, y:n.y - 23, class:'tok-label', style:'font-size:12px'}, L.route).textContent = i + 1;
-    });
+const ptr = {pts:new Map(), down:null, dragged:false, v0:null, pinch:null, nodeDrag:null, sc:1};
+svg.addEventListener('pointerdown', e => {
+  try { svg.setPointerCapture(e.pointerId); } catch (err) {}
+  ptr.pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if (ptr.pts.size === 1){
+    const hit = e.target.closest ? e.target.closest('[data-node]') : null;
+    ptr.down = {x:e.clientX, y:e.clientY, node:hit ? +hit.dataset.node : null};
+    ptr.dragged = false; ptr.v0 = {x:View.x, y:View.y}; ptr.sc = View.scale();
+    ptr.nodeDrag = screen === 'editor' && Editor.tool === 'move' && hit ? +hit.dataset.node : null;
+  } else if (ptr.pts.size === 2){
+    const [a, b] = [...ptr.pts.values()];
+    ptr.pinch = {d:Math.hypot(a.x - b.x, a.y - b.y) || 1, w:View.w};
+    ptr.dragged = true;
   }
-  if (v === 'agents' && state.lastReveal){
-    const n = N(state.lastReveal.node);
-    mk('circle', {cx:n.x, cy:n.y, r:33, class:'seen-ring'}, L.hl);
-    mk('rect', {x:n.x - 38, y:n.y - 62, width:76, height:22, rx:6, class:'seen-tag'}, L.hl);
-    mk('text', {x:n.x, y:n.y - 51, class:'seen-text'}, L.hl).textContent = 'SEEN · ' + state.lastReveal.move;
+});
+svg.addEventListener('pointermove', e => {
+  if (!ptr.pts.has(e.pointerId)) return;
+  ptr.pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if (ptr.pts.size === 2 && ptr.pinch){
+    const [a, b] = [...ptr.pts.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y) || 1, mid = toSvg((a.x + b.x) / 2, (a.y + b.y) / 2);
+    View.zoom(View.w / (ptr.pinch.w * ptr.pinch.d / d), mid.x, mid.y);
+    return;
   }
-  const opts = currentOptions();
-  for (const [id, set] of opts){
-    if (state.mode && !set.has(state.mode)) continue;
-    mk('circle', {cx:N(id).x, cy:N(id).y, r:29, class:'dest' + (!state.mode ? ' faint' : '') + (state.selected === id ? ' picked' : '')}, L.hl);
-  }
-
-  state.agents.forEach((a, i) => {
-    const n = N(a.pos);
-    if (v === 'agents' && i === state.turnAgent) mk('circle', {cx:n.x, cy:n.y, r:31, class:'cur-ring', stroke:a.color}, L.tokens);
-    mk('circle', {cx:n.x, cy:n.y, r:22, fill:a.color, stroke:'#0a0f1a', 'stroke-width':4}, L.tokens);
-    mk('text', {x:n.x, y:n.y + 1, class:'tok-label'}, L.tokens).textContent = a.pos;
-  });
-  if (v === 'shadow' || v === 'end'){
-    const n = N(state.shadow.pos);
-    const caught = state.agents.some(a => a.pos === state.shadow.pos);
-    const x = caught ? n.x + 26 : n.x, y = caught ? n.y + 26 : n.y;
-    mk('rect', {x:x - 17, y:y - 17, width:34, height:34, rx:4, transform:`rotate(45 ${x} ${y})`, fill:'var(--smoke)', stroke:'#fff', 'stroke-width':3}, L.tokens);
-    mk('text', {x, y:y + 1, class:'tok-label'}, L.tokens).textContent = state.shadow.pos;
+  if (!ptr.down) return;
+  const dx = e.clientX - ptr.down.x, dy = e.clientY - ptr.down.y;
+  if (!ptr.dragged && Math.hypot(dx, dy) > 6){ ptr.dragged = true; if (ptr.nodeDrag) Editor.snap(); else svg.classList.add('dragging'); }
+  if (!ptr.dragged) return;
+  if (ptr.nodeDrag){ Editor.dragTo(ptr.nodeDrag, toSvg(e.clientX, e.clientY)); }
+  else { View.x = ptr.v0.x - dx * ptr.sc; View.y = ptr.v0.y - dy * ptr.sc; View.apply(); }
+});
+function endPtr(e, cancel){
+  ptr.pts.delete(e.pointerId);
+  if (ptr.pts.size < 2) ptr.pinch = null;
+  if (ptr.pts.size === 0){
+    if (!cancel && ptr.down && !ptr.dragged) onMapTap(ptr.down.node, toSvg(e.clientX, e.clientY));
+    if (ptr.nodeDrag && ptr.dragged) Editor.refresh();
+    ptr.down = null; ptr.nodeDrag = null; svg.classList.remove('dragging');
   }
 }
+svg.addEventListener('pointerup', e => endPtr(e, false));
+svg.addEventListener('pointercancel', e => endPtr(e, true));
+svg.addEventListener('wheel', e => { e.preventDefault(); const p = toSvg(e.clientX, e.clientY); View.zoom(e.deltaY < 0 ? 1.18 : 1 / 1.18, p.x, p.y); }, {passive:false});
 
-function onNodeTap(id){
-  if (!state || screen !== 'game') return;
-  if (!state.mode) return;
-  const set = currentOptions().get(id);
-  state.selected = set && set.has(state.mode) ? id : null;
+function onMapTap(id, pt){
+  if (screen === 'editor') return Editor.tap(id, pt);
+  if (screen !== 'game' || !state || ui.paused || state.view.startsWith('cover')) return;
+  if (id == null){ ui.inspect = null; if (state.view !== 'end') ui.selected = null; render(); return; }
+  ui.inspect = id;
+  if (state.view === 'place-agents' || state.view === 'place-shadow'){
+    ui.selected = placeOptions().includes(id) ? id : null;
+  } else {
+    const set = currentOptions().get(id);
+    if (set){
+      if (ui.mode && set.has(ui.mode)) ui.selected = id;
+      else if (set.size === 1){ ui.mode = [...set][0]; ui.selected = id; }
+      else ui.selected = null;
+    } else ui.selected = null;
+  }
   render();
 }
 
-/* ---------- Panel ---------- */
-const wallet = (T, keys) => `<div class="wallet">${keys.map(k => `<span class="tk ${k}${T[k] ? '' : ' zero'}"><b>${T[k]}</b>${T_LABEL[k]}</span>`).join('')}</div>`;
-const goLabel = (m, id) => m === 'smoke' ? `Use Smoke to reach ${id}` : `Take the ${T_LABEL[m]} to ${id}`;
+function renderBoard(){
+  const m = MAP();
+  if (m !== drawnMap){
+    drawMap(m);
+    if (!drawnMap || View.mw !== m.w || View.mh !== m.h) View.fitTo(m);
+    drawnMap = m;
+  }
+  for (const k of ['suspects', 'route', 'hl', 'tokens', 'edit']) L[k].replaceChildren();
+  if (screen === 'editor') return Editor.drawOverlay();
+  if (screen !== 'game' || !state || state.view.startsWith('cover') || ui.paused) return;
+  const P = viewModel(), v = state.view, R = m.style.size, s = R / 19, N = id => m.byId.get(id);
+
+  if (state.cfg.tracker && ui.showSuspects && (v === 'agents' || v === 'shadow'))
+    for (const id of P.suspects){ const n = N(id); if (n) mk('circle', {cx:n.px, cy:n.py, r:R * 1.5, class:'suspect', 'stroke-width':2 * s}, L.suspects); }
+
+  let agentPos = P.agents.map(a => a.pos), shadowPos = P.shadow.pos;
+  if (v === 'end' && P.events){
+    const k = ui.replay == null ? P.events.length : ui.replay;
+    agentPos = P.agents.map(a => a.start); shadowPos = P.shadow.start;
+    const path = [shadowPos];
+    P.events.slice(0, k).forEach(e => { if (e.k === 's'){ shadowPos = e.to; path.push(e.to); } else agentPos[e.i] = e.to; });
+    mk('polyline', {points:path.map(id => `${N(id).px},${N(id).py}`).join(' '), class:'route', 'stroke-width':7 * s}, L.route);
+    path.slice(1).forEach((id, i) => {
+      const n = N(id);
+      mk('circle', {cx:n.px + R * 1.25, cy:n.py - R * 1.25, r:R * .6, class:'route-dot'}, L.route);
+      mk('text', {x:n.px + R * 1.25, y:n.py - R * 1.2, class:'tok-label', 'font-size':R * .62}, L.route).textContent = i + 1;
+    });
+  }
+  if (v === 'agents' && P.lastReveal){
+    const n = N(P.lastReveal.node);
+    mk('circle', {cx:n.px, cy:n.py, r:R * 1.75, class:'seen-ring', 'stroke-width':3 * s, 'stroke-dasharray':`${4 * s} ${5 * s}`}, L.hl);
+    mk('rect', {x:n.px - R * 2.1, y:n.py - R * 3.3, width:R * 4.2, height:R * 1.2, rx:R * .3, class:'seen-tag'}, L.hl);
+    mk('text', {x:n.px, y:n.py - R * 2.7, class:'seen-text', 'font-size':R * .72}, L.hl).textContent = 'SEEN · T' + P.lastReveal.turn;
+  }
+  const ring = (id, faint) => {
+    const n = N(id), on = ui.selected === id;
+    mk('circle', {cx:n.px, cy:n.py, r:R * 1.5, class:'dest' + (faint ? ' faint' : '') + (on ? ' picked' : ''), 'stroke-width':(on ? 5 : 3) * s, 'stroke-dasharray':on ? null : `${7 * s} ${6 * s}`}, L.hl);
+  };
+  if (v === 'place-agents' || v === 'place-shadow') placeOptions().forEach(id => ring(id, false));
+  else for (const [id, set] of currentOptions()){ if (!ui.mode || set.has(ui.mode)) ring(id, !ui.mode); }
+  if (ui.inspect && N(ui.inspect)){ const n = N(ui.inspect); mk('circle', {cx:n.px, cy:n.py, r:R * 1.95, class:'inspect', 'stroke-width':2 * s, 'stroke-dasharray':`${2 * s} ${4 * s}`}, L.hl); }
+
+  P.agents.forEach((a, i) => {
+    const pos = agentPos[i]; if (pos == null) return;
+    const n = N(pos);
+    if (v === 'agents' && !state.agentsDone && i === state.turnAgent) mk('circle', {cx:n.px, cy:n.py, r:R * 1.65, class:'cur-ring', stroke:a.color, 'stroke-width':4 * s}, L.tokens);
+    mk('circle', {cx:n.px, cy:n.py, r:R * 1.16, fill:a.color, stroke:'#0a0f1a', 'stroke-width':4 * s}, L.tokens);
+    mk('text', {x:n.px, y:n.py + s, class:'tok-label', 'font-size':R * .95}, L.tokens).textContent = pos;
+  });
+  if (shadowPos != null){
+    const n = N(shadowPos), caught = agentPos.includes(shadowPos);
+    const x = caught ? n.px + R * 1.35 : n.px, y = caught ? n.py + R * 1.35 : n.py, h = R * .9;
+    mk('rect', {x:x - h, y:y - h, width:h * 2, height:h * 2, rx:R * .2, transform:`rotate(45 ${x} ${y})`, fill:'var(--smoke)', stroke:'#fff', 'stroke-width':3 * s}, L.tokens);
+    mk('text', {x, y:y + s, class:'tok-label', 'font-size':R * .95}, L.tokens).textContent = shadowPos;
+  }
+}
+
+/* =====================================================================
+   UIRenderer: panel
+   ===================================================================== */
+const wallet = (T, keys) => `<div class="wallet">${keys.map(k => `<span class="tk k-${k}${T[k] ? '' : ' zero'}"><b>${T[k]}</b>${TK[k].label}</span>`).join('')}</div>`;
+const goLabel = (m, id) => m === 'smoke' ? `Use Smoke to reach ${id}` : `Take the ${TK[m].label} to ${id}`;
 function transportStep(opts, T, kinds){
-  const reach = k => [...opts.values()].filter(set => set.has(k)).length;
-  if (!state.mode){
+  if (!ui.mode){
+    const reach = k => [...opts.values()].filter(s => s.has(k)).length;
     return `<div class="step"><span class="eyebrow">Step 1 · Choose how to travel</span><div class="modes">${kinds.map(k => {
-      const n = reach(k), off = !T[k] || !n;
-      return `<button type="button" class="mode ${k}" data-act="mode" data-m="${k}"${off ? ' disabled' : ''}><b>${T_LABEL[k]}</b><span>${T[k]} ticket${T[k] === 1 ? '' : 's'} · ${!T[k] ? 'none left' : n ? n + ' place' + (n > 1 ? 's' : '') + ' to go' : 'no route from here'}</span></button>`;
-    }).join('')}</div></div>`;
+      const n = reach(k), off = !T[k] || !n, low = T[k] > 0 && T[k] <= 2;
+      return `<button type="button" class="mode k-${k}" data-act="mode" data-m="${k}"${off ? ' disabled' : ''}>${low ? '<em>Low</em>' : ''}<b>${TK[k].label}</b><span>${T[k]} ticket${T[k] === 1 ? '' : 's'} · ${!T[k] ? 'none left' : n ? n + ' place' + (n > 1 ? 's' : '') + ' to go' : 'no route from here'}</span></button>`;
+    }).join('')}</div><p class="hint">Or tap a faint ring on the map.</p></div>`;
   }
-  const dests = [...opts.keys()].filter(id => opts.get(id).has(state.mode)).sort((a, b) => a - b);
-  let h = `<div class="step"><div class="step-head"><span class="eyebrow">Step 2 · Choose where to go by ${T_LABEL[state.mode]}</span><button type="button" class="link" data-act="mode" data-m="">Change transport</button></div>
-    <div class="dests">${dests.map(id => `<button type="button" class="dest-btn${state.selected === id ? ' on' : ''}" data-act="pick" data-to="${id}">${id}</button>`).join('')}</div>`;
-  h += state.selected && dests.includes(state.selected)
-    ? `<button type="button" class="primary go ${state.mode}" data-act="go">${goLabel(state.mode, state.selected)}</button>`
-    : `<p class="hint">Tap a number above, or a ringed crossing on the map.</p>`;
+  const dests = [...opts.keys()].filter(id => opts.get(id).has(ui.mode)).sort((a, b) => a - b);
+  let h = `<div class="step"><div class="step-head"><span class="eyebrow">Step 2 · Choose where to go by ${TK[ui.mode].label}</span><button type="button" class="link" data-act="mode" data-m="">Change transport</button></div>
+    <div class="dests">${dests.map(id => `<button type="button" class="dest-btn${ui.selected === id ? ' on' : ''}" data-act="pick" data-to="${id}">${id}</button>`).join('')}</div>`;
+  h += ui.selected && dests.includes(ui.selected)
+    ? `<div class="confirm"><button type="button" class="primary tint k-${ui.mode}" data-act="confirm">${goLabel(ui.mode, ui.selected)}</button><button type="button" class="secondary" data-act="cancel">Cancel</button></div>`
+    : `<p class="hint">Tap a number above or a ringed crossing on the map.</p>`;
   return h + '</div>';
 }
-function logGrid(showAll){
+function placeStep(who){
+  const opts = placeOptions().slice().sort((a, b) => a - b);
+  return `<div class="step"><span class="eyebrow">Choose a starting crossing for ${esc(who)}</span>
+    <div class="dests">${opts.map(id => `<button type="button" class="dest-btn${ui.selected === id ? ' on' : ''}" data-act="pick" data-to="${id}">${id}</button>`).join('')}</div>
+    ${ui.selected ? `<div class="confirm"><button type="button" class="primary" data-act="confirm-place">Start ${esc(who)} at ${ui.selected}</button><button type="button" class="secondary" data-act="cancel">Cancel</button></div>` : '<p class="hint">Tap a number above or a ringed crossing on the map.</p>'}</div>`;
+}
+function infoCard(P){
+  const id = ui.inspect, m = MAP();
+  if (!id || !m.byId.has(id)) return '';
+  const groups = EDGE_KINDS.map(t => [t, [...new Set(m.adj.get(id).filter(x => x.t === t).map(x => x.to))].sort((a, b) => a - b)]).filter(g => g[1].length);
+  const here = P.agents.filter(a => a.pos === id).map(a => esc(a.name));
+  if (P.shadow.pos === id) here.push(esc(P.shadow.name));
+  let reach = '';
+  if ((state.view === 'shadow' && !state.shadowDone) || (state.view === 'agents' && !state.agentsDone)){
+    const set = currentOptions().get(id);
+    const mine = state.view === 'shadow' ? P.shadow.pos : P.agents[state.turnAgent].pos;
+    reach = set ? `<div class="chips">${['taxi','bus','train','smoke'].filter(t => set.has(t)).map(t => `<button type="button" class="chip-btn k-${t}" data-act="go-via" data-to="${id}" data-t="${t}">Go by ${TK[t].label}</button>`).join('')}</div>`
+      : `<p class="hint">${id === mine ? 'This is where you are.' : 'You cannot move here this turn.'}</p>`;
+  }
+  return `<div class="card"><div class="step-head"><span class="eyebrow">Crossing ${id}</span><button type="button" class="link" data-act="uninspect">Close</button></div>
+    <dl class="kv">${groups.map(([t, l]) => `<dt>${TK[t].label}</dt><dd>${l.join(', ')}</dd>`).join('') || '<dt>Links</dt><dd>none</dd>'}<dt>Here now</dt><dd>${here.join(', ') || 'nobody'}</dd></dl>${reach}</div>`;
+}
+function travelLog(P, showAll){
+  const total = state.cfg.turns, reveals = state.cfg.reveals, next = reveals.find(r => r > state.log.length);
   let h = '<div class="tlog">';
-  for (let i = 1; i <= MOVES_TOTAL; i++){
-    const e = state.log[i - 1], rv = REVEALS.includes(i);
-    const node = e && (showAll || e.reveal) ? `<span class="p">${e.node}</span>` : '';
-    h += `<div class="slot${e ? ' t-' + e.ticket : ''}${rv ? ' reveal' : ''}" title="Turn ${i}${rv ? ' (sighting)' : ''}"><span class="n">${i}</span>${e ? `<span class="v">${T_SHORT[e.ticket]}</span>` : (rv ? '<span class="v">SEEN</span>' : '')}${node}</div>`;
+  for (let i = 1; i <= total; i++){
+    const e = P.log[i - 1], rv = reveals.includes(i);
+    const node = e && (showAll || e.reveal) && e.node != null ? `<span class="p">${e.node}</span>` : '';
+    h += `<div class="slot${e ? ' t-' + e.ticket : ''}${rv ? ' reveal' : ''}" title="Turn ${i}${rv ? ', sighting' : ''}"><span class="n">${i}</span>${e ? `<span class="v">${TK[e.ticket].short}</span>` : (rv ? '<span class="v">SEEN</span>' : '')}${node}</div>`;
   }
-  return h + '</div>';
+  h += '</div>';
+  const trk = state.cfg.tracker && state.view !== 'end'
+    ? `<button type="button" class="toggle" data-act="tracker" aria-pressed="${ui.showSuspects}"><span>Shade where ${esc(P.shadow.name)} could be <b class="mono">(${P.suspects.length})</b></span><span class="sw"></span></button>` : '';
+  return `<div class="card"><div class="eyebrow">${esc(P.shadow.name)}'s travel log${next && state.phase !== 'over' ? ` · next sighting on turn ${next}` : ''}</div>${h}${trk}</div>`;
 }
-const nextReveal = () => REVEALS.find(r => r > state.log.length);
-function logCard(showAll){
-  const n = nextReveal();
-  const trk = state.tracker && state.view !== 'end'
-    ? `<button type="button" class="toggle" data-act="tracker" aria-pressed="${showSuspects}"><span>Show where the Shadow could be <b class="mono">(${state.suspects.length})</b></span><span class="sw"></span></button>` : '';
-  return `<div class="card"><div class="eyebrow">Shadow's travel log${n ? ` · next sighting on turn ${n}` : ''}</div>${logGrid(showAll)}${trk}</div>`;
+function agentLog(P){
+  const ev = P.agentEvents.slice().reverse();
+  return `<div class="card"><details class="fold"><summary><span class="eyebrow">Agent moves (${ev.length})</span></summary>
+    ${ev.length ? `<ul class="loglist" style="margin-top:10px">${ev.map(e => `<li><span class="tn">T${e.turn}</span><span class="tt k-${e.t}">${TK[e.t].label}</span><span class="tx">${esc(P.agents[e.i].name)} · ${e.from} → ${e.to}</span></li>`).join('')}</ul>` : '<p class="hint" style="margin-top:10px">No agent has moved yet.</p>'}</details></div>`;
 }
-function rosterCard(){
-  return `<div class="card"><div class="eyebrow">Agents</div><div class="roster">${state.agents.map((a, i) => `
-    <div class="ag"><span class="dot" style="color:${a.color};background:${a.color}"></span>
-      <span class="nm${state.view === 'agents' && i === state.turnAgent ? ' on' : ''}">${esc(a.name)} <span class="at">at ${a.pos}</span></span>
-      <span class="mini"><span class="c-cab">${a.tickets.cab}</span><span class="c-tram">${a.tickets.tram}</span><span class="c-metro">${a.tickets.metro}</span></span></div>`).join('')}</div></div>`;
+function privateLog(P){
+  const rows = P.log.slice().reverse();
+  return `<div class="card"><span class="eyebrow">${state.view === 'end' ? esc(P.shadow.name) + "'s full route" : 'Your private route'}</span>
+    ${rows.length ? `<ul class="loglist">${rows.map(e => `<li><span class="tn">T${e.turn}</span><span class="tt k-${e.ticket}">${TK[e.ticket].label}</span><span class="tx">${e.from} → ${e.node}${e.reveal ? ' · seen' : ''}</span></li>`).join('')}</ul>` : ''}
+    <p class="hint">Started at ${P.shadow.start}.</p></div>`;
+}
+function roster(P){
+  return `<div class="card"><div class="eyebrow">Players</div><div class="roster">
+    <div class="ag"><span class="diamond" style="width:12px;height:12px;margin:2px"></span><span class="nm">${esc(P.shadow.name)} <span class="at">${P.shadow.pos != null ? 'at ' + P.shadow.pos : 'hidden'}</span></span>
+      <span class="mini">${P.priv ? `<span class="k-taxi">${P.shadow.tickets.taxi}</span><span class="k-bus">${P.shadow.tickets.bus}</span><span class="k-train">${P.shadow.tickets.train}</span>` : ''}<span class="k-smoke">${P.shadow.tickets.smoke}</span><span class="k-double">${P.shadow.tickets.double}</span></span></div>
+    ${P.agents.map((a, i) => `<div class="ag"><span class="dot" style="--c:${a.color}"></span>
+      <span class="nm${state.view === 'agents' && !state.agentsDone && i === state.turnAgent ? ' on' : ''}">${esc(a.name)} <span class="at">${a.pos != null ? 'at ' + a.pos : ''}</span></span>
+      <span class="mini"><span class="k-taxi">${a.tickets.taxi}</span><span class="k-bus">${a.tickets.bus}</span><span class="k-train">${a.tickets.train}</span></span></div>`).join('')}
+    </div><p class="hint">Coloured counts are Taxi, Bus and Train tickets. ${esc(P.shadow.name)}'s violet and white counts are Smoke and Double moves.</p></div>`;
 }
 
 function renderPanel(){
   const p = $('#panel');
-  if (screen !== 'game' || !state || state.view.startsWith('cover')){ p.innerHTML = ''; return; }
-  const v = state.view;
+  if (screen === 'editor'){ p.innerHTML = Editor.panel(); return; }
+  if (screen !== 'game' || !state || state.view.startsWith('cover') || ui.paused){ p.innerHTML = ''; return; }
+  const P = viewModel(), v = state.view, cfg = state.cfg;
   let h = '';
+  if (v === 'place-agents'){
+    const a = state.agents[state.turnAgent];
+    h += `<div class="card turn-head"><span class="eyebrow">Setting up · agent ${state.turnAgent + 1} of ${state.agents.length}</span><h2><span class="dot" style="--c:${a.color}"></span>${esc(a.name)}</h2><p>Pick a starting crossing. Everyone can watch this part.</p></div>`;
+    h += `<div class="card">${placeStep(a.name)}</div>` + infoCard(P) + roster(P);
+  }
+  if (v === 'place-shadow'){
+    h += `<div class="card turn-head"><span class="eyebrow">Secret · keep this screen to yourself</span><h2><span class="diamond"></span>${esc(P.shadow.name)}</h2><p>Pick where you start hiding. You move first.</p></div>`;
+    h += `<div class="card">${placeStep(P.shadow.name)}</div>` + infoCard(P);
+  }
   if (v === 'shadow'){
-    const moveNo = state.log.length + 1;
+    const turn = state.log.length + 1;
     h += `<div class="card turn-head"><span class="eyebrow">Secret turn · keep this screen to yourself</span>
-      <h2><span class="diamond"></span>${esc(state.shadowName)}</h2>
-      <p>You are hiding at <b class="mono">${state.shadow.pos}</b>.${state.shadowDone ? '' : ` This is turn <b class="mono">${moveNo}</b> of ${MOVES_TOTAL}.`}</p></div>`;
+      <h2><span class="diamond"></span>${esc(P.shadow.name)}</h2>
+      <p>You are hiding at <b class="mono">${P.shadow.pos}</b>.${state.shadowDone ? '' : ` This is turn <b class="mono">${turn}</b> of ${cfg.turns}.`}</p></div>`;
     if (state.shadowDone){
-      const lines = state.turnMoves.map(m => `<li>Turn ${m.move}: ${T_LABEL[m.ticket]} to <b class="mono">${m.node}</b>${m.reveal ? ' (agents will see this)' : ''}</li>`).join('');
-      h += `<div class="card"><div class="eyebrow">Your turn is done</div><ul style="margin:0;padding-left:18px">${lines}</ul>
+      h += `<div class="card"><div class="eyebrow">Your turn is done</div><ul style="margin:0;padding-left:18px">${state.turnMoves.map(m => `<li>Turn ${m.turn}: ${TK[m.ticket].label} from ${m.from} to <b class="mono">${m.node}</b>${m.reveal ? ' (the agents will see this one)' : ''}</li>`).join('')}</ul>
         <p class="hint">Hide the screen, then hand the device to the agents.</p>
-        <button type="button" class="primary" data-act="pass">Hide and pass to the agents</button></div>`;
+        <div class="confirm"><button type="button" class="primary" data-act="pass">Hide and pass to the agents</button><button type="button" class="secondary" data-act="undo"${canUndo() ? '' : ' disabled'}>Undo last move</button></div></div>`;
     } else {
       const opts = shadowOptions();
-      if (REVEALS.includes(moveNo)) h += `<div class="alert hot">Turn ${moveNo} is a sighting. The agents will see where you land.</div>`;
-      if (state.sprint.step === 2) h += `<div class="alert">Sprint: make your second move now. It uses turn ${moveNo} of the log.</div>`;
-      h += `<div class="card">${transportStep(opts, state.shadow.tickets, ['cab','tram','metro','smoke'])}</div>`;
-      const T = state.shadow.tickets;
-      const canSprint = T.sprint > 0 && state.sprint.step !== 2 && state.log.length <= MOVES_TOTAL - 2;
-      h += `<div class="card"><div class="eyebrow">Your tickets</div>${wallet(T, ['cab','tram','metro','smoke','sprint'])}
-        ${canSprint ? `<button type="button" class="toggle" data-act="sprint" aria-pressed="${state.sprint.active}"><span><b>Sprint</b> · move twice in a row (uses 2 turns)</span><span class="sw"></span></button>` : ''}
+      if (cfg.reveals.includes(turn)) h += `<div class="alert hot">Turn ${turn} is a sighting. The agents will see where you land.</div>`;
+      if (state.double.step === 2) h += `<div class="alert">Double move: make your second move now. It uses turn ${turn}.</div>`;
+      h += `<div class="card">${transportStep(opts, P.shadow.tickets, ['taxi','bus','train','smoke'])}${canUndo() ? '<button type="button" class="secondary small" data-act="undo">Undo your first move</button>' : ''}</div>`;
+      const T = P.shadow.tickets;
+      const canDouble = cfg.doubleOn && T.double > 0 && state.double.step !== 2 && state.turnMoves.length === 0 && state.log.length <= cfg.turns - 2;
+      h += `<div class="card"><div class="eyebrow">Your tickets</div>${wallet(T, ['taxi','bus','train','smoke','double'])}
+        ${canDouble ? `<button type="button" class="toggle" data-act="double" aria-pressed="${state.double.armed}"><span><b>Double move</b> · move twice in a row, using 2 turns</span><span class="sw"></span></button>` : ''}
         <p class="hint">Smoke hides which transport you took and is the only ticket that rides the ferry.</p></div>`;
     }
-    h += logCard(true);
+    h += infoCard(P) + privateLog(P) + travelLog(P, true);
   }
   if (v === 'agents'){
-    const a = state.agents[state.turnAgent], opts = agentOptions(state.turnAgent);
-    if (state.spottedFresh && state.lastReveal) h += `<div class="alert hot">Sighting: the Shadow was seen at <b>${state.lastReveal.node}</b> on turn ${state.lastReveal.move}.</div>`;
-    const last = state.log[state.log.length - 1];
-    h += `<div class="card turn-head"><span class="eyebrow">Turn ${state.log.length} · agent ${state.turnAgent + 1} of ${state.agents.length}</span>
-      <h2><span class="dot" style="color:${a.color};background:${a.color}"></span>${esc(a.name)}</h2>
-      <p>At <b class="mono">${a.pos}</b>. The Shadow's last ticket: <b>${last ? T_LABEL[last.ticket] : '—'}</b>.</p></div>`;
-    if (opts.size){
-      h += `<div class="card">${transportStep(opts, a.tickets, ['cab','tram','metro'])}</div>`;
+    const a = state.agents[state.turnAgent];
+    if (state.spottedFresh && P.lastReveal) h += `<div class="alert hot">Sighting: ${esc(P.shadow.name)} was seen at <b>${P.lastReveal.node}</b> on turn ${P.lastReveal.turn}.</div>`;
+    const last = P.log[P.log.length - 1];
+    if (state.agentsDone){
+      h += `<div class="card turn-head"><span class="eyebrow">Turn ${state.log.length} of ${cfg.turns}</span><h2>Agents done</h2><p>Every agent has had a go this turn.</p></div>
+        <div class="card"><div class="confirm"><button type="button" class="primary" data-act="end-round">${state.log.length >= cfg.turns ? 'Finish the game' : `End turn and pass to ${esc(P.shadow.name)}`}</button><button type="button" class="secondary" data-act="undo"${canUndo() ? '' : ' disabled'}>Undo last move</button></div></div>`;
     } else {
-      h += `<div class="card"><p>${esc(a.name)} has no legal move from ${a.pos} and sits this turn out.</p><button type="button" class="secondary" data-act="skip">Next agent</button></div>`;
+      const opts = agentOptions(state.turnAgent);
+      h += `<div class="card turn-head"><span class="eyebrow">Turn ${state.log.length} of ${cfg.turns} · agent ${state.turnAgent + 1} of ${state.agents.length}</span>
+        <h2><span class="dot" style="--c:${a.color}"></span>${esc(a.name)}</h2>
+        <p>At <b class="mono">${a.pos}</b>. ${esc(P.shadow.name)}'s last ticket: <b>${last ? TK[last.ticket].label : 'none yet'}</b>.</p></div>`;
+      h += opts.size ? `<div class="card">${transportStep(opts, a.tickets, MOVE_KINDS)}${canUndo() ? '<button type="button" class="secondary small" data-act="undo">Undo the previous agent\'s move</button>' : ''}</div>`
+        : `<div class="card"><p>${esc(a.name)} has no legal move from ${a.pos} and sits this turn out.</p><button type="button" class="secondary" data-act="skip">Next agent</button></div>`;
     }
-    h += logCard(false) + rosterCard();
+    h += infoCard(P) + travelLog(P, false) + roster(P) + agentLog(P);
   }
   if (v === 'end'){
-    const win = state.winner === 'agents';
-    const seen = state.log.filter(e => e.reveal).length, smoke = state.log.filter(e => e.ticket === 'smoke').length;
-    h += `<div class="card result"><span class="eyebrow">Game over</span><h2>${win ? 'The agents win' : esc(state.shadowName) + ' escapes'}</h2>
+    const win = state.winner, seen = state.log.filter(e => e.reveal).length;
+    const k = ui.replay == null ? P.events.length : ui.replay;
+    h += `<div class="card result"><span class="eyebrow">Game over</span><h2>${win === 'agents' ? 'The agents win' : win === 'shadow' ? esc(P.shadow.name) + ' escapes' : 'Game ended'}</h2>
       <p class="hint" style="font-size:15px">${esc(state.reason)}</p>
-      <div class="stats"><div class="stat"><b>${state.log.length}</b><span>Turns</span></div><div class="stat"><b>${seen}</b><span>Sightings</span></div><div class="stat"><b>${smoke}</b><span>Smoke used</span></div></div>
-      <p class="hint">The violet line on the map is the Shadow's full route, starting at ${state.shadowStart}.</p>
-      <button type="button" class="primary" data-act="again">Play again</button></div>`;
-    h += logCard(true) + rosterCard();
+      <div class="stats"><div class="stat"><b>${state.log.length}</b><span>Turns</span></div><div class="stat"><b>${state.events.length}</b><span>Moves</span></div><div class="stat"><b>${seen}</b><span>Sightings</span></div></div>
+      <button type="button" class="primary" data-act="menu">New game</button></div>
+      <div class="card"><span class="eyebrow">Replay</span><div class="replay">
+        <div class="rp-btns"><button type="button" class="secondary small" data-act="rp" data-d="-9999">« Start</button><button type="button" class="secondary small" data-act="rp" data-d="-1">‹ Back</button><button type="button" class="secondary small" data-act="rp-play" id="rpPlay">${ui.playing ? 'Pause' : 'Play'}</button><button type="button" class="secondary small" data-act="rp" data-d="1">Next ›</button><button type="button" class="secondary small" data-act="rp" data-d="9999">End »</button></div>
+        <input type="range" id="rpRange" min="0" max="${P.events.length}" value="${k}" aria-label="Replay position">
+        <p class="hint" id="rpText">${replayText(k)}</p></div></div>`;
+    h += infoCard(P) + privateLog(P) + travelLog(P, true) + roster(P) + agentLog(P);
   }
   p.innerHTML = h;
-  const row = p.querySelector('.dest-btn.on');
-  if (row) row.scrollIntoView({block:'nearest'});
+}
+function replayText(k){
+  if (!state) return '';
+  if (k <= 0) return `Starting positions. ${esc(state.shadow.name)} began at ${state.shadow.start}.`;
+  const e = state.events[k - 1];
+  const who = e.k === 's' ? state.shadow.name : state.agents[e.i].name;
+  return `Move ${k} of ${state.events.length}, turn ${e.turn}: ${esc(who)} took the ${TK[e.t].label} from ${e.from} to ${e.to}.`;
 }
 
 function renderStatus(){
   const s = $('#status');
+  $('#subtitle').textContent = screen === 'editor' ? 'Map editor' : (state && screen === 'game' && state.mapKey === 'custom' ? (state.mapData.name || 'Custom map') : 'Port Veyra · after midnight');
+  if (screen === 'editor'){ s.innerHTML = `<b>${Editor.map.nodes.length}</b> crossings · <b>${Editor.map.edges.length}</b> links`; return; }
   if (screen !== 'game' || !state){ s.innerHTML = ''; return; }
-  const n = nextReveal();
+  const cfg = state.cfg;
+  if (state.phase === 'place'){ s.innerHTML = '<b>Choosing starting spots</b>'; return; }
   const shadowTurn = state.phase === 'shadow' && !state.shadowDone;
-  const turn = Math.min(MOVES_TOTAL, Math.max(1, state.log.length + (shadowTurn ? 1 : 0)));
+  const turn = clamp(state.log.length + (shadowTurn ? 1 : 0), 1, cfg.turns);
   const who = state.phase === 'over' ? 'game over'
-    : state.phase === 'shadow' ? esc(state.shadowName) + "'s turn"
-    : state.view === 'cover-agents' ? "agents' turn" : esc(state.agents[state.turnAgent].name) + "'s turn";
-  s.innerHTML = `Turn <b>${turn}</b>/${MOVES_TOTAL} · <b>${who}</b>${n && state.phase !== 'over' ? ` · sighting on turn ${n}` : ''}`;
+    : state.phase === 'shadow' ? esc(state.shadow.name) + "'s turn"
+    : state.view === 'cover-agents' || state.agentsDone ? "agents' turn" : esc(state.agents[state.turnAgent].name) + "'s turn";
+  const next = cfg.reveals.find(r => r > state.log.length);
+  s.innerHTML = `Turn <b>${turn}</b>/${cfg.turns} · <b>${who}</b>${next && state.phase !== 'over' ? ` · sighting on turn ${next}` : ''}${ui.paused ? ' · <b>paused</b>' : ''}`;
+}
+function renderHeader(){
+  const game = screen === 'game' && !!state;
+  $('#undoBtn').hidden = !game; $('#undoBtn').disabled = !canUndo();
+  $('#pauseBtn').hidden = !game || state.phase === 'over'; $('#pauseBtn').textContent = ui.paused ? 'Resume' : 'Pause';
+  $('#endBtn').hidden = !game || state.phase === 'over';
+  $('#menuBtn').hidden = screen === 'setup';
+  $('#menuBtn').textContent = screen === 'editor' ? 'Close editor' : 'Menu';
+  document.body.classList.toggle('no-motion', !(state && screen === 'game' ? state.cfg.motion : setupCfg.motion));
 }
 
-/* ---------- Overlays ---------- */
+/* =====================================================================
+   Overlays: setup, hand-off curtain, pause, modal
+   ===================================================================== */
+function rulesList(c){
+  return `<ul>
+    <li><b>Turns.</b> Each turn ${esc(c.shadowName || 'the Shadow')} moves first, in secret. Then every agent moves once, in order. The game lasts ${c.turns} turns.</li>
+    <li><b>Moving.</b> Pick how to travel, then where. <b>Taxi</b> follows the yellow streets, <b>Bus</b> the teal lines, <b>Train</b> the red lines. Each trip costs one ticket of that kind. Every player starts with ${c.tickets.taxi} Taxi, ${c.tickets.bus} Bus and ${c.tickets.train} Train tickets.</li>
+    <li><b>The log.</b> Agents see which ticket the Shadow used, never where it went, except on sighting turns <b>${esc(c.revealsText)}</b>.</li>
+    <li><b>Smoke</b> tickets hide which transport the Shadow used and are the only way onto the <b>ferry</b>. A <b>Double move</b> lets the Shadow move twice in a row, using two turns.</li>
+    <li><b>Blocking.</b> Two agents can never share a crossing, and the Shadow cannot move onto an agent.</li>
+    <li><b>Winning.</b> Agents win by moving onto the Shadow, or by leaving it no move. The Shadow wins by staying free for all ${c.turns} turns, or if no agent can move.</li>
+  </ul>`;
+}
 function renderSetup(){
   const o = $('#setup');
   o.hidden = screen !== 'setup';
-  if (o.hidden) return;
-  const saved = load();
-  const resume = saved && saved.phase !== 'over';
-  const c = setupCfg;
-  o.innerHTML = `<form class="sheet" id="setupForm" autocomplete="off">
-    <div><div class="eyebrow">Pass-and-play · 3 to 5 players · one device</div><h1>Shadow Trail</h1></div>
-    <p>One player is the Shadow, moving in secret through Port Veyra. Everyone else runs the agents and tries to corner them before turn ${MOVES_TOTAL} ends.</p>
-    <div class="field"><label for="shadowName">Shadow player</label><input type="text" id="shadowName" maxlength="18" value="${esc(c.shadowName)}"></div>
-    <div class="field"><span class="lbl">Agents</span><div class="seg">${[2,3,4].map(k => `<button type="button" data-act="count" data-n="${k}" aria-pressed="${c.count === k}">${k}</button>`).join('')}</div></div>
-    <div class="agent-names">${c.names.slice(0, c.count).map((nm, i) => `<div class="an"><span class="dot" style="color:${AGENT_COLORS[i]};background:${AGENT_COLORS[i]}"></span><input type="text" id="agent${i}" maxlength="14" value="${esc(nm)}" aria-label="Agent ${i + 1} name" style="background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:8px 10px;width:100%;min-width:0"></div>`).join('')}</div>
-    <button type="button" class="toggle" data-act="setup-tracker" aria-pressed="${c.tracker}"><span><b>Hideout tracker</b> · shade every crossing the Shadow could be on</span><span class="sw"></span></button>
-    <details class="rules"><summary>How to play</summary>${rulesList()}</details>
+  if (o.hidden){ o.innerHTML = ''; return; }
+  const c = setupCfg, saved = loadGame(), resume = saved && saved.phase !== 'over';
+  const customOk = !!customRaw;
+  const cv = customOk ? validateMap(customRaw, c.agentCount + 1) : null;
+  if (c.map === 'custom' && !customOk) c.map = 'builtin';
+  const num = (id, label, val, max) => `<div class="field"><label for="${id}">${label}</label><input class="inp mono" type="number" inputmode="numeric" min="0" max="${max}" id="${id}" value="${val}"></div>`;
+  o.innerHTML = `<form class="sheet wide" id="setupForm" autocomplete="off" novalidate>
+    <div><div class="eyebrow">Pass-and-play · one device · 3 to 6 players</div><h1>Shadow Trail</h1></div>
+    <p>One player is the Shadow, moving in secret. Everyone else plays the agents together and tries to catch the Shadow before the last turn.</p>
+    <fieldset><legend>Players</legend>
+      <div class="field"><label for="f-shadow">Shadow player</label><input class="inp" type="text" id="f-shadow" maxlength="18" value="${esc(c.shadowName)}"></div>
+      <div class="field"><span class="lbl">Number of agents</span><div class="seg">${[2,3,4,5].map(k => `<button type="button" data-act="set" data-k="agentCount" data-v="${k}" aria-pressed="${c.agentCount === k}">${k}</button>`).join('')}</div></div>
+      <div class="agent-names">${c.agentNames.slice(0, c.agentCount).map((nm, i) => `<div class="an"><span class="dot" style="--c:${AGENT_COLORS[i]}"></span><input class="inp" type="text" id="f-agent${i}" maxlength="14" value="${esc(nm)}" aria-label="Agent ${i + 1} name"></div>`).join('')}</div>
+      <div class="field"><span class="lbl">Starting spots</span><div class="seg">
+        <button type="button" data-act="set" data-k="placement" data-v="random" aria-pressed="${c.placement === 'random'}">Random</button>
+        <button type="button" data-act="set" data-k="placement" data-v="manual" aria-pressed="${c.placement === 'manual'}">Players choose</button></div></div>
+    </fieldset>
+    <fieldset><legend>Map</legend>
+      <div class="seg">
+        <button type="button" data-act="set" data-k="map" data-v="builtin" aria-pressed="${c.map === 'builtin'}"><span class="mapopt">Port Veyra<span>Built in · ${BUILTIN.nodes.length} crossings</span></span></button>
+        <button type="button" data-act="set" data-k="map" data-v="custom" aria-pressed="${c.map === 'custom'}"${customOk ? '' : ' disabled'}><span class="mapopt">${customOk ? esc(customRaw.name || 'My map') : 'Your own map'}<span>${customOk ? `${customRaw.nodes.length} crossings${cv.errors.length ? ` · ${cv.errors.length} problem${cv.errors.length > 1 ? 's' : ''}` : ''}` : 'None saved yet'}</span></span></button>
+      </div>
+      <button type="button" class="secondary" data-act="open-editor">${customOk ? 'Edit your map' : 'Make your own map'}</button>
+      <p class="hint">The map editor lets you place numbered crossings over a picture of your own, link them by Taxi, Bus, Train or Ferry, and check the result.</p>
+    </fieldset>
+    <fieldset><legend>Tickets for every player</legend>
+      <div class="grid3">${num('f-taxi', 'Taxi', c.tickets.taxi, 99)}${num('f-bus', 'Bus', c.tickets.bus, 99)}${num('f-train', 'Train', c.tickets.train, 99)}</div>
+      <div class="grid2">${num('f-smoke', 'Shadow Smoke tickets', c.smoke, 20)}${num('f-doubles', 'Shadow Double moves', c.doubles, 10)}</div>
+      <button type="button" class="toggle" data-act="toggle" data-k="doubleOn" aria-pressed="${c.doubleOn}"><span><b>Double moves</b> · allow the Shadow to move twice in a row</span><span class="sw"></span></button>
+    </fieldset>
+    <fieldset><legend>Turns</legend>
+      <div class="grid2">${num('f-turns', 'Number of turns', c.turns, 60)}<div class="field"><label for="f-reveals">Sighting turns</label><input class="inp mono" type="text" id="f-reveals" value="${esc(c.revealsText)}"></div></div>
+      <p class="hint">On sighting turns everyone sees where the Shadow lands. Separate the turn numbers with commas.</p>
+    </fieldset>
+    <fieldset><legend>Options</legend>
+      <button type="button" class="toggle" data-act="toggle" data-k="tracker" aria-pressed="${c.tracker}"><span><b>Hideout tracker</b> · shade every crossing the Shadow could be on</span><span class="sw"></span></button>
+      <button type="button" class="toggle" data-act="toggle" data-k="sound" aria-pressed="${c.sound}"><span><b>Sound</b> · short tones for moves and results</span><span class="sw"></span></button>
+      <button type="button" class="toggle" data-act="toggle" data-k="motion" aria-pressed="${c.motion}"><span><b>Animations</b> · moving rings on the map</span><span class="sw"></span></button>
+      <button type="button" class="secondary small" data-act="defaults">Reset settings to defaults</button>
+    </fieldset>
+    <details class="rules"><summary>How to play</summary>${rulesList(c)}</details>
+    ${ui.setupErr ? `<p class="err-box" role="alert">${esc(ui.setupErr)}</p>` : ''}
     <div class="actions">${resume ? `<button type="button" class="secondary" data-act="resume">Resume game (turn ${Math.max(1, saved.log.length)})</button>` : ''}<button type="submit" class="primary">Start new game</button></div>
   </form>`;
-  $('#setupForm').addEventListener('submit', e => { e.preventDefault(); readSetup(); newGame(setupCfg); });
 }
 function readSetup(){
-  const sn = $('#shadowName'); if (sn) setupCfg.shadowName = sn.value;
-  for (let i = 0; i < 4; i++){ const f = $('#agent' + i); if (f) setupCfg.names[i] = f.value; }
+  const val = id => { const e = document.getElementById(id); return e ? e.value : null; };
+  const n = (id, lo, hi, def) => { const x = parseInt(val(id), 10); return Number.isFinite(x) ? clamp(x, lo, hi) : def; };
+  if (val('f-shadow') !== null) setupCfg.shadowName = val('f-shadow');
+  for (let i = 0; i < 5; i++){ const x = val('f-agent' + i); if (x !== null) setupCfg.agentNames[i] = x; }
+  if (val('f-taxi') !== null){
+    setupCfg.tickets = {taxi:n('f-taxi', 0, 99, 20), bus:n('f-bus', 0, 99, 10), train:n('f-train', 0, 99, 5)};
+    setupCfg.smoke = n('f-smoke', 0, 20, 5); setupCfg.doubles = n('f-doubles', 0, 10, 2);
+    setupCfg.turns = n('f-turns', 3, 60, 24); setupCfg.revealsText = val('f-reveals');
+  }
+  Store.set(KEYS.setup, setupCfg);
 }
-function rulesList(){
-  return `<ul>
-    <li><b>Turns.</b> Each turn the Shadow moves first, in secret. Then every agent moves once, in order. The game lasts ${MOVES_TOTAL} turns.</li>
-    <li><b>Moving.</b> First pick how to travel, then pick where. <b>Taxi</b> follows the yellow streets, <b>Bus</b> the teal lines, <b>Train</b> the red lines (long jumps). Each trip costs one ticket of that kind. Agents start with 10 taxi, 8 bus and 4 train tickets.</li>
-    <li><b>The log.</b> Agents see which ticket the Shadow used, never where it went, except on sighting turns <b>${REVEALS.join(', ')}</b>.</li>
-    <li><b>Smoke</b> tickets hide the transport used and are the only way onto the <b>ferry</b>. <b>Sprint</b> lets the Shadow move twice in a row, using two turns of the log.</li>
-    <li><b>Spent tickets.</b> Every ticket an agent spends goes to the Shadow.</li>
-    <li><b>Blocking.</b> Nobody can move onto a crossing an agent is standing on.</li>
-    <li><b>Winning.</b> Agents win by landing on the Shadow or leaving it no move. The Shadow wins by lasting ${MOVES_TOTAL} turns, or if no agent can move.</li>
-  </ul>`;
+function startFromSetup(){
+  readSetup();
+  const c = setupCfg;
+  const r = parseReveals(c.revealsText, c.turns);
+  if (r.error){ ui.setupErr = r.error; renderSetup(); return; }
+  if (!r.list.length){ ui.setupErr = 'Add at least one sighting turn, or the agents will have nothing to go on.'; renderSetup(); return; }
+  if (c.tickets.taxi + c.tickets.bus + c.tickets.train < 1){ ui.setupErr = 'Give every player at least one ticket.'; renderSetup(); return; }
+  newGame(Object.assign(clone(c), {reveals:r.list, revealsText:r.list.join(', ')}));
 }
+
 function renderCover(){
   const o = $('#cover');
-  const on = screen === 'game' && state && state.view.startsWith('cover');
+  const on = screen === 'game' && !!state && state.view.startsWith('cover') && !ui.paused;
   o.hidden = !on;
-  if (!on) return;
-  if (state.view === 'cover-shadow'){
-    const first = state.log.length === 0;
-    o.innerHTML = `<div class="sheet cover"><div class="big diamond"></div><div class="eyebrow">Turn ${state.log.length + 1} of ${MOVES_TOTAL}</div>
-      <h1>Pass to ${esc(state.shadowName)}</h1>
-      <p>Agents, look away. Only the Shadow should see the next screen${first ? ', which shows where the Shadow starts' : ''}.</p>
-      <button type="button" class="primary" data-act="show-shadow">I'm ${esc(state.shadowName)}. Show my position</button></div>`;
+  if (!on){ o.innerHTML = ''; return; }
+  const name = esc(state.shadow.name);
+  if (state.view === 'cover-shadow' || state.view === 'cover-place-shadow'){
+    const placing = state.view === 'cover-place-shadow', first = state.log.length === 0;
+    o.innerHTML = `<div class="sheet cover"><div class="big diamond"></div><div class="eyebrow">${placing ? 'Setting up' : `Turn ${state.log.length + 1} of ${state.cfg.turns}`}</div>
+      <h1>Pass to ${name}</h1>
+      <p>Agents, look away. Only ${name} should see the next screen${placing ? ', where they choose a hiding place' : first ? ', which shows where they start' : ''}.</p>
+      <button type="button" class="primary" data-act="${placing ? 'show-place-shadow' : 'show-shadow'}">I'm ${name}. Show my screen</button></div>`;
   } else {
     const m = state.turnMoves.length;
-    o.innerHTML = `<div class="sheet cover"><div class="big" style="display:flex;gap:8px;justify-content:center;align-items:center;width:auto">${state.agents.map(a => `<span class="dot" style="width:22px;height:22px;color:${a.color};background:${a.color}"></span>`).join('')}</div>
-      <div class="eyebrow">Turn ${state.log.length} of ${MOVES_TOTAL} · the Shadow moved ${m === 2 ? 'twice' : 'once'}</div>
+    o.innerHTML = `<div class="sheet cover"><div style="display:flex;gap:10px;justify-content:center">${state.agents.map(a => `<span class="dot" style="--c:${a.color};width:22px;height:22px"></span>`).join('')}</div>
+      <div class="eyebrow">Turn ${state.log.length} of ${state.cfg.turns} · ${name} moved ${m === 2 ? 'twice' : 'once'}</div>
       <h1>Agents' turn</h1>
-      <p>Shadow, hand the device over now.${state.spottedFresh ? ' There is a sighting waiting.' : ''}</p>
+      <p>${name}, hand the device over now.${state.spottedFresh ? ' A sighting is waiting.' : ''}</p>
       <button type="button" class="primary" data-act="show-agents">Agents ready</button></div>`;
   }
 }
-function openModal(html){ const m = $('#modal'); m.innerHTML = `<div class="sheet">${html}</div>`; m.hidden = false; }
-function closeModal(){ $('#modal').hidden = true; }
+function renderPause(){
+  const o = $('#pause');
+  o.hidden = !(screen === 'game' && ui.paused);
+  if (o.hidden){ o.innerHTML = ''; return; }
+  o.innerHTML = `<div class="sheet cover"><div class="eyebrow">The map is hidden</div><h1>Paused</h1><p>Nothing can move until the game is resumed. The game is saved on this device.</p><button type="button" class="primary" data-act="pause">Resume game</button></div>`;
+}
+function openModal(html){ const m = $('#modal'); m.innerHTML = `<div class="sheet">${html}</div>`; m.hidden = false; const f = m.querySelector('textarea, button'); if (f) f.focus(); }
+function closeModal(){ $('#modal').hidden = true; $('#modal').innerHTML = ''; }
 
 function render(){
-  renderSetup(); renderCover(); renderStatus(); renderBoard(); renderPanel();
-  $('#quitBtn').hidden = screen !== 'game';
+  renderSetup(); renderCover(); renderPause(); renderStatus(); renderHeader(); renderBoard(); renderPanel();
 }
 
-/* ---------- Sizing ---------- */
-const scroller = $('#boardScroll');
-function sizeMap(){
-  const wide = window.matchMedia('(min-width: 861px)').matches;
-  const w = scroller.clientWidth;
-  let base = w;
-  if (wide){ const avail = window.innerHeight - scroller.getBoundingClientRect().top - 60; base = Math.max(360, Math.min(w, avail)); }
-  const px = Math.round(base * zoom);
-  svg.style.width = px + 'px'; svg.style.height = px + 'px';
-  scroller.style.height = Math.round(base) + 2 + 'px';
-}
-function centerOn(id){
-  const n = CITY.nodes[id]; if (!n) return;
-  const px = svg.clientWidth / 1000;
-  scroller.scrollTo({left:n.x * px - scroller.clientWidth / 2, top:n.y * px - scroller.clientHeight / 2, behavior:'smooth'});
-}
-function setZoom(z){
-  const cx = (scroller.scrollLeft + scroller.clientWidth / 2) / svg.clientWidth, cy = (scroller.scrollTop + scroller.clientHeight / 2) / svg.clientHeight;
-  zoom = Math.max(1, Math.min(2.6, z));
-  sizeMap();
-  scroller.scrollLeft = cx * svg.clientWidth - scroller.clientWidth / 2;
-  scroller.scrollTop = cy * svg.clientHeight - scroller.clientHeight / 2;
-}
+/* =====================================================================
+   Map editor
+   ===================================================================== */
+const blankMap = () => ({v:1, name:'My map', w:1200, h:900, nodes:[], edges:[], starts:[], style:{lines:true, labels:true, size:14}});
+const Editor = {
+  map:blankMap(), prepared:null, tool:'add', etype:'taxi', sel:null, hist:[], dirty:false, msg:'', report:null, raf:0,
+  open(){
+    readSetup();
+    this.map = customRaw ? clone(customRaw) : blankMap();
+    this.map.style = Object.assign({lines:true, labels:true, size:14}, this.map.style || {});
+    this.map.image = customImage;
+    this.sel = null; this.hist = []; this.dirty = false; this.msg = ''; this.report = null;
+    screen = 'editor'; this.prepared = prepare(this.map);
+    drawnMap = null; render(); View.fitTo(this.map);
+  },
+  refresh(){ this.prepared = prepare(this.map); render(); },
+  snap(){ const m = Object.assign({}, this.map, {image:null}); this.hist.push(JSON.stringify(m)); if (this.hist.length > 150) this.hist.shift(); this.dirty = true; this.report = null; this.msg = ''; },
+  undo(){ const s = this.hist.pop(); if (!s) return; const img = this.map.image; this.map = JSON.parse(s); this.map.image = img; this.sel = null; this.refresh(); },
+  nextId(){ return this.map.nodes.reduce((m, n) => Math.max(m, n.id), 0) + 1; },
+  node(id){ return this.map.nodes.find(n => n.id === id); },
+  tap(id, pt){
+    const m = this.map;
+    switch (this.tool){
+      case 'add':
+        if (id != null){ this.sel = id; break; }
+        if (pt.x < 0 || pt.y < 0 || pt.x > m.w || pt.y > m.h) break;
+        this.snap();
+        { const nid = this.nextId(); m.nodes.push({id:nid, x:+(pt.x / m.w).toFixed(5), y:+(pt.y / m.h).toFixed(5)}); this.sel = nid; }
+        break;
+      case 'move': this.sel = id; break;
+      case 'connect':
+        if (id == null){ this.sel = null; break; }
+        if (this.sel == null || this.sel === id || !this.node(this.sel)){ this.sel = this.sel === id ? null : id; break; }
+        this.snap(); this.toggleEdge(this.sel, id, this.etype); this.sel = id;
+        break;
+      case 'start':
+        if (id == null) break;
+        this.snap(); m.starts = m.starts.includes(id) ? m.starts.filter(s => s !== id) : m.starts.concat(id); this.sel = id;
+        break;
+      case 'delete':
+        if (id == null) break;
+        this.snap(); this.removeNode(id);
+        break;
+    }
+    this.refresh();
+  },
+  toggleEdge(a, b, t){
+    const i = this.map.edges.findIndex(e => e.t === t && ((e.a === a && e.b === b) || (e.a === b && e.b === a)));
+    if (i >= 0) this.map.edges.splice(i, 1); else this.map.edges.push({a, b, t});
+  },
+  removeNode(id){
+    const m = this.map;
+    m.nodes = m.nodes.filter(n => n.id !== id);
+    m.edges = m.edges.filter(e => e.a !== id && e.b !== id);
+    m.starts = m.starts.filter(s => s !== id);
+    if (this.sel === id) this.sel = null;
+  },
+  dragTo(id, pt){
+    const n = this.node(id); if (!n) return;
+    n.x = +clamp(pt.x / this.map.w, 0, 1).toFixed(5); n.y = +clamp(pt.y / this.map.h, 0, 1).toFixed(5);
+    this.sel = id;
+    if (!this.raf) this.raf = requestAnimationFrame(() => { this.raf = 0; this.prepared = prepare(this.map); renderBoard(); });
+  },
+  renumber(v){
+    const id = this.sel, nv = parseInt(v, 10);
+    if (id == null) return;
+    if (!Number.isInteger(nv) || nv < 1){ this.msg = 'Use a whole number from 1 up.'; return this.refresh(); }
+    if (nv !== id && this.node(nv)){ this.msg = `Number ${nv} is already on the map.`; return this.refresh(); }
+    if (nv === id) return;
+    this.snap();
+    this.node(id).id = nv;
+    this.map.edges.forEach(e => { if (e.a === id) e.a = nv; if (e.b === id) e.b = nv; });
+    this.map.starts = this.map.starts.map(s => s === id ? nv : s);
+    this.sel = nv; this.msg = `Crossing ${id} is now ${nv}.`; this.refresh();
+  },
+  drawOverlay(){
+    const m = this.prepared, R = m.style.size, s = R / 19;
+    for (const id of m.starts){ const n = m.byId.get(id); if (n) mk('circle', {cx:n.px, cy:n.py, r:R * 1.5, class:'ed-start', 'stroke-width':3 * s, 'stroke-dasharray':`${3 * s} ${3 * s}`}, L.edit); }
+    const n = this.sel != null && m.byId.get(this.sel);
+    if (n){
+      mk('circle', {cx:n.px, cy:n.py, r:R * 1.8, class:'ed-sel', 'stroke-width':5 * s}, L.edit);
+      if (!m.style.labels) mk('text', {x:n.px, y:n.py - R * 2.4, class:'n-label', 'font-size':R * 1.1}, L.edit).textContent = n.id;
+    }
+  },
+  async save(){
+    const name = ($('#e-name') && $('#e-name').value.trim()) || 'My map';
+    this.map.name = name;
+    const raw = Object.assign({}, this.map); delete raw.image; raw.v = 1;
+    if (!Store.set(KEYS.map, raw)){ this.msg = 'This browser would not save the map. Its storage may be full or turned off.'; return this.refresh(); }
+    customRaw = clone(raw);
+    const ok = await Store.setAsset('mapImage', this.map.image || null);
+    customImage = this.map.image || null;
+    mapCache = {src:null, img:null, m:null};
+    this.dirty = false; setupCfg.map = 'custom'; Store.set(KEYS.setup, setupCfg);
+    this.msg = ok || !this.map.image ? `Saved “${name}”. Choose it under Map when you start a game.` : 'Saved the crossings and links, but this browser would not store the background picture.';
+    this.refresh();
+  },
+  exportJson(){ const raw = Object.assign({}, this.map); delete raw.image; raw.name = ($('#e-name') && $('#e-name').value.trim()) || raw.name; return JSON.stringify(raw); },
+  importJson(text){
+    let d;
+    try { d = JSON.parse(text); } catch (e) { return 'That is not valid JSON.'; }
+    if (!d || !Array.isArray(d.nodes) || !Array.isArray(d.edges)) return 'The JSON needs "nodes" and "edges" lists.';
+    const nodes = d.nodes.map(n => ({id:Number(n.id), x:Number(n.x), y:Number(n.y)}));
+    if (nodes.some(n => !Number.isFinite(n.x) || !Number.isFinite(n.y))) return 'Every crossing needs numeric x and y between 0 and 1.';
+    const edges = d.edges.map(e => ({a:Number(e.a), b:Number(e.b), t:String(e.t)}));
+    this.snap();
+    const img = typeof d.image === 'string' && d.image.startsWith('data:image') ? d.image : this.map.image;
+    this.map = {v:1, name:String(d.name || 'Imported map'), w:Number(d.w) > 0 ? Number(d.w) : 1200, h:Number(d.h) > 0 ? Number(d.h) : 900, nodes, edges,
+      starts:Array.isArray(d.starts) ? d.starts.map(Number) : [], style:Object.assign({lines:true, labels:true, size:14}, d.style || {}), image:img};
+    this.sel = null; drawnMap = null; this.prepared = prepare(this.map);
+    this.report = validateMap(this.map, 0);
+    this.msg = `Imported ${nodes.length} crossings and ${edges.length} links.`;
+    return null;
+  },
+  loadImage(file){
+    const r = new FileReader();
+    r.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        this.snap();
+        this.map.image = r.result; this.map.w = 1200; this.map.h = Math.round(1200 * img.naturalHeight / img.naturalWidth);
+        this.prepared = prepare(this.map); drawnMap = null;
+        this.msg = `Background set (${img.naturalWidth} × ${img.naturalHeight} pixels). Crossings keep their place relative to the picture.`;
+        render();
+      };
+      img.onerror = () => { this.msg = 'That file could not be opened as a picture.'; render(); };
+      img.src = r.result;
+    };
+    r.readAsDataURL(file);
+  },
+  panel(){
+    const m = this.map, pm = this.prepared;
+    const tools = [['add', 'Add'], ['move', 'Move'], ['connect', 'Connect'], ['start', 'Start spots'], ['delete', 'Delete']];
+    const help = {
+      add:'Tap an empty spot to add a crossing. It gets the next free number, which you can change below.',
+      move:'Drag a crossing to move it. Drag empty space to pan.',
+      connect:`Tap one crossing, then another, to add or remove a ${TK[this.etype].label} link. The second crossing stays selected, so you can trace a whole route tap by tap.`,
+      start:'Tap crossings to mark them as possible starting spots (green dashed rings).',
+      delete:'Tap a crossing to delete it and all of its links.'
+    }[this.tool];
+    const counts = EDGE_KINDS.map(t => `${m.edges.filter(e => e.t === t).length} ${TK[t].label}`).join(' · ');
+    const sel = this.sel != null && pm.byId.get(this.sel);
+    let selHtml = '<p class="hint">Tap a crossing to see and edit it.</p>';
+    if (sel){
+      const links = pm.adj.get(sel.id).slice().sort((a, b) => a.t.localeCompare(b.t) || a.to - b.to);
+      selHtml = `<div class="grid2" style="align-items:end"><div class="field"><label for="e-num">Number</label><input class="inp mono" id="e-num" type="number" min="1" value="${sel.id}"></div><button type="button" class="secondary" data-act="e-renum">Apply number</button></div>
+        ${links.length ? `<ul class="loglist">${links.map(l => `<li><span class="tn">${sel.id}</span><span class="tt k-${l.t}">${TK[l.t].label}</span><span class="tx" style="display:flex;justify-content:space-between;gap:8px">to ${l.to}<button type="button" class="link" data-act="e-del-edge" data-a="${sel.id}" data-b="${l.to}" data-t="${l.t}">Remove</button></span></li>`).join('')}</ul>` : '<p class="hint">No links yet. Use Connect to add some.</p>'}
+        <p class="hint">${pm.starts.includes(sel.id) ? 'This is a starting spot.' : 'Not a starting spot.'}</p>`;
+    }
+    const rep = this.report;
+    return `<div class="card turn-head"><span class="eyebrow">Map editor</span><h2>Build a map</h2>
+        <p>Only the numbered crossings you add are playable. Lines in a background picture mean nothing to the game until you add them as links.</p></div>
+      ${this.msg ? `<div class="alert">${esc(this.msg)}</div>` : ''}
+      <div class="card"><div class="field"><label for="e-name">Map name</label><input class="inp" id="e-name" maxlength="40" value="${esc(m.name)}"></div>
+        <div class="actions"><label class="secondary filebtn">${m.image ? 'Change picture' : 'Choose background picture'}<input type="file" accept="image/*" id="e-img" hidden></label>${m.image ? '<button type="button" class="secondary" data-act="e-img-clear">Remove picture</button>' : ''}</div></div>
+      <div class="card"><span class="eyebrow">Tool</span><div class="seg">${tools.map(([k, l]) => `<button type="button" data-act="e-tool" data-v="${k}" aria-pressed="${this.tool === k}">${l}</button>`).join('')}</div>
+        ${this.tool === 'connect' ? `<span class="eyebrow">Link type</span><div class="seg">${EDGE_KINDS.map(t => `<button type="button" data-act="e-type" data-v="${t}" aria-pressed="${this.etype === t}">${TK[t].label}</button>`).join('')}</div>` : ''}
+        <p class="hint">${help}</p>
+        <div class="actions"><button type="button" class="secondary small" data-act="e-undo"${this.hist.length ? '' : ' disabled'}>Undo edit</button></div></div>
+      <div class="card"><span class="eyebrow">Selected crossing</span>${selHtml}</div>
+      <div class="card"><span class="eyebrow">Display</span>
+        <button type="button" class="toggle" data-act="e-style" data-k="lines" aria-pressed="${m.style.lines}"><span>Draw links on the map</span><span class="sw"></span></button>
+        <button type="button" class="toggle" data-act="e-style" data-k="labels" aria-pressed="${m.style.labels}"><span>Numbered markers (off shows rings only)</span><span class="sw"></span></button>
+        <div class="field"><label for="e-size">Marker size</label><input type="range" id="e-size" min="6" max="30" value="${m.style.size}" style="accent-color:var(--smoke)"></div></div>
+      <div class="card"><span class="eyebrow">${m.nodes.length} crossings · ${m.starts.length} starting spots</span><p class="hint">${counts}</p>
+        <div class="actions"><button type="button" class="secondary" data-act="e-check">Check map</button><button type="button" class="primary" data-act="e-save">Save map</button></div>
+        ${rep ? (rep.errors.length || rep.warnings.length ? `${rep.errors.length ? `<ul class="vlist err">${rep.errors.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}${rep.warnings.length ? `<ul class="vlist warn">${rep.warnings.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}` : '<div class="alert good">No problems found.</div>') : ''}
+        <div class="actions"><button type="button" class="secondary small" data-act="e-export">Export JSON</button><button type="button" class="secondary small" data-act="e-import">Import JSON</button></div>
+        <div class="actions"><button type="button" class="secondary small" data-act="e-sample">Start from a copy of Port Veyra</button><button type="button" class="secondary small danger" data-act="e-clear">Clear map</button></div></div>`;
+  }
+};
 
-/* ---------- Actions ---------- */
+/* =====================================================================
+   Actions
+   ===================================================================== */
+let rpTimer = null;
+function stopReplay(){ if (rpTimer){ clearInterval(rpTimer); rpTimer = null; } ui.playing = null; }
+function setReplay(k){
+  if (!state) return;
+  ui.replay = clamp(k, 0, state.events.length);
+  renderBoard();
+  const r = $('#rpRange'), t = $('#rpText');
+  if (r) r.value = ui.replay;
+  if (t) t.innerHTML = replayText(ui.replay);
+}
+function leaveEditor(){ screen = 'setup'; drawnMap = null; render(); }
+
 document.addEventListener('click', e => {
-  const b = e.target.closest('[data-act]'); if (!b) return;
-  const act = b.dataset.act;
+  const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
+  const act = b.dataset.act, d = b.dataset;
+  if (act !== 'rp-play' && act !== 'rp') stopReplay();
   switch (act){
-    case 'mode': state.mode = b.dataset.m || null; state.selected = null; render(); break;
-    case 'pick': state.selected = +b.dataset.to; render(); break;
-    case 'go': {
-      const to = state.selected, t = state.mode;
-      if (!to || !t) break;
-      if (state.view === 'shadow') doShadowMove(to, t); else if (state.view === 'agents') doAgentMove(to, t);
-      break; }
-    case 'sprint':
-      if (state.sprint.step !== 2){ state.sprint = state.sprint.active ? {active:false, step:0} : {active:true, step:1}; save(); render(); }
+    /* board */
+    case 'zoom-in': View.zoom(1.3); break;
+    case 'zoom-out': View.zoom(1 / 1.3); break;
+    case 'fit': View.fit(); break;
+    case 'fullscreen':
+      try {
+        if (document.fullscreenElement) document.exitFullscreen();
+        else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+      } catch (err) {}
       break;
-    case 'pass': state.phase = 'agents'; state.view = 'cover-agents'; state.turnAgent = 0; save(); render(); break;
-    case 'show-shadow':
-      state.view = 'shadow'; state.selected = null; state.mode = null; save(); render(); centerOn(state.shadow.pos);
-      if (shadowOptions().size === 0) endGame('agents', `The Shadow is cornered at ${state.shadow.pos} with nowhere left to go.`);
+    /* header */
+    case 'undo': undo(); break;
+    case 'pause': ui.paused = !ui.paused; render(); break;
+    case 'rules': openModal(`<h3>How to play</h3><div class="rules">${rulesList(state && screen === 'game' ? state.cfg : setupCfg)}</div><button type="button" class="primary" data-act="close">Got it</button>`); break;
+    case 'end': openModal(`<h3>End this game?</h3><p>The game stops now with no winner, and the Shadow's route is shown to everyone.</p><div class="actions"><button type="button" class="secondary" data-act="close">Keep playing</button><button type="button" class="primary" data-act="confirm-end">End game</button></div>`); break;
+    case 'confirm-end': closeModal(); endGame(null, 'The game was ended before anyone won.'); break;
+    case 'menu':
+      if (screen === 'editor'){
+        if (Editor.dirty) openModal(`<h3>Leave the editor?</h3><p>Changes since your last save will be lost.</p><div class="actions"><button type="button" class="secondary" data-act="close">Stay</button><button type="button" class="primary" data-act="confirm-leave-editor">Leave without saving</button></div>`);
+        else leaveEditor();
+      } else { ui.paused = false; screen = 'setup'; render(); }
       break;
-    case 'show-agents': state.view = 'agents'; save(); render(); centerOn(state.agents[0].pos); break;
-    case 'skip': nextAgent(); break;
-    case 'tracker': showSuspects = !showSuspects; render(); break;
-    case 'zoom-in': setZoom(zoom * 1.3); break;
-    case 'zoom-out': setZoom(zoom / 1.3); break;
-    case 'count': readSetup(); setupCfg.count = +b.dataset.n; renderSetup(); break;
-    case 'setup-tracker': readSetup(); setupCfg.tracker = !setupCfg.tracker; renderSetup(); break;
-    case 'resume': {
-      const s = load(); if (!s) break;
-      state = s; if (state.view === 'shadow') state.view = 'cover-shadow';
-      screen = 'game'; render(); break; }
-    case 'again': screen = 'setup'; render(); break;
-    case 'rules': openModal(`<h3>How to play</h3><div class="rules">${rulesList()}</div><button type="button" class="primary" data-act="close">Got it</button>`); break;
-    case 'quit': openModal(`<h3>Start a new game?</h3><p>The current game will be lost.</p><div class="actions"><button type="button" class="secondary" data-act="close">Keep playing</button><button type="button" class="primary" data-act="confirm-quit">Start over</button></div>`); break;
-    case 'confirm-quit': closeModal(); if (state){ state.phase = 'over'; save(); } screen = 'setup'; render(); break;
+    case 'confirm-leave-editor': closeModal(); leaveEditor(); break;
     case 'close': closeModal(); break;
+    /* setup */
+    case 'set': readSetup(); setupCfg[d.k] = d.k === 'agentCount' ? +d.v : d.v; Store.set(KEYS.setup, setupCfg); ui.setupErr = ''; renderSetup(); break;
+    case 'toggle': readSetup(); setupCfg[d.k] = !setupCfg[d.k]; Store.set(KEYS.setup, setupCfg); renderSetup(); renderHeader(); break;
+    case 'defaults': setupCfg = clone(DEFAULT_CFG); Store.set(KEYS.setup, setupCfg); ui.setupErr = ''; renderSetup(); break;
+    case 'resume': {
+      const s = loadGame(); if (!s) break;
+      if (s.mapKey === 'custom' && !s.mapData){ ui.setupErr = 'That saved game used a map that is no longer available.'; renderSetup(); break; }
+      state = s; history = []; resetUi(); ui.paused = false; ui.replay = state.phase === 'over' ? state.events.length : null;
+      if (state.view === 'shadow') state.view = 'cover-shadow';
+      if (state.view === 'place-shadow') state.view = 'cover-place-shadow';
+      screen = 'game'; drawnMap = null; render(); break; }
+    case 'open-editor': Editor.open(); break;
+    /* hand-offs */
+    case 'show-shadow':
+      state.view = 'shadow'; resetUi(); saveGame(); render(); View.centerOn(state.shadow.pos);
+      if (!state.shadowDone && shadowOptions().size === 0) endGame('agents', `${state.shadow.name} is cornered at ${state.shadow.pos} with no way out.`);
+      break;
+    case 'show-place-shadow': state.view = 'place-shadow'; resetUi(); saveGame(); render(); break;
+    case 'show-agents': state.view = 'agents'; resetUi(); saveGame(); render(); View.centerOn(state.agents[state.turnAgent].pos); break;
+    case 'pass': state.phase = 'agents'; state.view = 'cover-agents'; state.turnAgent = 0; state.agentsDone = false; history = []; resetUi(); saveGame(); render(); break;
+    case 'end-round': endRound(); break;
+    case 'skip': pushHistory('agents'); resetUi(); advanceAgent(); break;
+    /* moving */
+    case 'mode': ui.mode = d.m || null; ui.selected = null; render(); break;
+    case 'pick': ui.selected = +d.to; ui.inspect = +d.to; render(); break;
+    case 'go-via': ui.mode = d.t; ui.selected = +d.to; render(); break;
+    case 'cancel': ui.selected = null; render(); break;
+    case 'confirm': commitMove(); break;
+    case 'uninspect': ui.inspect = null; render(); break;
+    case 'confirm-place': {
+      const id = ui.selected; if (!placeOptions().includes(id)) break;
+      if (state.view === 'place-agents'){
+        const a = state.agents[state.turnAgent]; a.pos = a.start = id; state.turnAgent++;
+        if (state.turnAgent >= state.agents.length){ state.turnAgent = 0; state.view = 'cover-place-shadow'; }
+      } else { state.shadow.pos = state.shadow.start = id; beginPlay(true); }
+      resetUi(); saveGame(); render(); break; }
+    case 'double': if (state.double.step !== 2){ state.double = state.double.armed ? {armed:false, step:0} : {armed:true, step:1}; saveGame(); render(); } break;
+    case 'tracker': ui.showSuspects = !ui.showSuspects; render(); break;
+    /* replay */
+    case 'rp': setReplay((ui.replay ?? state.events.length) + Number(d.d)); break;
+    case 'rp-play':
+      if (rpTimer){ stopReplay(); b.textContent = 'Play'; break; }
+      if ((ui.replay ?? 0) >= state.events.length) setReplay(0);
+      ui.playing = true; b.textContent = 'Pause';
+      rpTimer = setInterval(() => { if (!state || ui.replay >= state.events.length){ stopReplay(); const pb = $('#rpPlay'); if (pb) pb.textContent = 'Play'; return; } setReplay(ui.replay + 1); }, 700);
+      break;
+    /* editor */
+    case 'e-tool': Editor.tool = d.v; render(); break;
+    case 'e-type': Editor.etype = d.v; render(); break;
+    case 'e-undo': Editor.undo(); break;
+    case 'e-renum': Editor.renumber($('#e-num').value); break;
+    case 'e-del-edge': Editor.snap(); Editor.toggleEdge(+d.a, +d.b, d.t); Editor.refresh(); break;
+    case 'e-style': Editor.snap(); Editor.map.style[d.k] = !Editor.map.style[d.k]; Editor.refresh(); break;
+    case 'e-img-clear': Editor.snap(); Editor.map.image = null; Editor.prepared = prepare(Editor.map); drawnMap = null; render(); break;
+    case 'e-check': Editor.report = validateMap(Editor.map, 0); render(); break;
+    case 'e-save': Editor.save(); break;
+    case 'e-export': {
+      const json = Editor.exportJson();
+      openModal(`<h3>Export map</h3><p>Copy this text to keep a backup or move the map to another device. The background picture is not included.</p>
+        <textarea class="inp" id="exportText" readonly>${esc(json)}</textarea>
+        <div class="actions"><button type="button" class="primary" data-act="copy-export">Copy</button><a class="secondary filebtn" id="dlLink" download="shadow-trail-map.json">Download file</a><button type="button" class="secondary" data-act="close">Close</button></div><p class="hint" id="copyMsg"></p>`);
+      try { $('#dlLink').href = URL.createObjectURL(new Blob([json], {type:'application/json'})); } catch (err) { $('#dlLink').hidden = true; }
+      break; }
+    case 'copy-export': {
+      const t = $('#exportText');
+      const done = ok => { $('#copyMsg').textContent = ok ? 'Copied.' : 'Copying did not work here. The text is selected, so copy it by hand.'; if (!ok){ t.focus(); t.select(); } };
+      try { navigator.clipboard.writeText(t.value).then(() => done(true), () => done(false)); } catch (err) { done(false); }
+      break; }
+    case 'e-import':
+      openModal(`<h3>Import map</h3><p>Paste exported map JSON, or choose a .json file. This replaces the map in the editor; Undo edit brings the old one back.</p>
+        <textarea class="inp" id="importText" placeholder='{"nodes":[...],"edges":[...]}'></textarea>
+        <label class="secondary filebtn">Choose a .json file<input type="file" accept=".json,application/json" id="importFile" hidden></label>
+        <p class="err-box" id="importErr"></p>
+        <div class="actions"><button type="button" class="secondary" data-act="close">Cancel</button><button type="button" class="primary" data-act="import-apply">Import</button></div>`);
+      break;
+    case 'import-apply': { const err = Editor.importJson($('#importText').value); if (err){ $('#importErr').textContent = err; break; } closeModal(); render(); View.fitTo(Editor.map); break; }
+    case 'e-sample': {
+      Editor.snap();
+      const c = clone(BUILTIN_RAW); delete c.decor; delete c.builtin; c.name = 'Port Veyra copy'; c.image = Editor.map.image;
+      Editor.map = c; Editor.sel = null; Editor.prepared = prepare(c); drawnMap = null; Editor.msg = 'Loaded a copy of Port Veyra. Edit it, then save it as your own map.'; render(); break; }
+    case 'e-clear': openModal(`<h3>Clear the map?</h3><p>This removes every crossing and link from the editor. Undo edit brings them back.</p><div class="actions"><button type="button" class="secondary" data-act="close">Keep them</button><button type="button" class="primary" data-act="e-clear-yes">Clear map</button></div>`); break;
+    case 'e-clear-yes': closeModal(); Editor.snap(); Editor.map.nodes = []; Editor.map.edges = []; Editor.map.starts = []; Editor.sel = null; Editor.refresh(); break;
   }
 });
+document.addEventListener('submit', e => { if (e.target.id === 'setupForm'){ e.preventDefault(); startFromSetup(); } });
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.id === 'e-img' && t.files[0]) Editor.loadImage(t.files[0]);
+  if (t.id === 'e-name'){ Editor.map.name = t.value; Editor.dirty = true; }
+  if (t.id === 'importFile' && t.files[0]){ const r = new FileReader(); r.onload = () => { $('#importText').value = r.result; }; r.readAsText(t.files[0]); }
+  if (t.closest && t.closest('#setupForm')) readSetup();
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.id === 'rpRange'){ stopReplay(); setReplay(+t.value); const pb = $('#rpPlay'); if (pb) pb.textContent = 'Play'; }
+  if (t.id === 'e-size'){ Editor.map.style.size = +t.value; Editor.dirty = true; Editor.prepared = prepare(Editor.map); renderBoard(); }
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (!$('#modal').hidden) closeModal();
+  else if (screen === 'game' && ui.selected){ ui.selected = null; render(); }
+});
 $('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+document.addEventListener('fullscreenchange', () => { $('#fsBtn').textContent = document.fullscreenElement ? 'Exit full screen' : 'Full screen'; });
 
-/* ---------- Boot ---------- */
-drawStatic();
-window.addEventListener('resize', sizeMap);
+/* =====================================================================
+   Boot
+   ===================================================================== */
 function start(data){
-  if (data && data.state){ state = data.state; screen = data.screen || 'game'; if (state.view === 'shadow') state.view = 'cover-shadow'; }
-  zoom = window.matchMedia('(max-width: 860px)').matches ? 1.5 : 1;
-  render(); sizeMap();
+  if (data && data.state){
+    state = data.state; screen = data.screen === 'game' ? 'game' : 'setup';
+    if (state.view === 'shadow') state.view = 'cover-shadow';
+    if (state.view === 'place-shadow') state.view = 'cover-place-shadow';
+  }
+  render();
+  Store.getAsset('mapImage').then(img => { if (img){ customImage = img; mapCache = {src:null, img:null, m:null}; render(); } });
 }
 try { window.claude?.hot?.snapshot?.(() => ({state, screen})); } catch (e) {}
 if (window.claude?.hot?.ready) window.claude.hot.ready(start); else start(window.claude?.hot?.data ?? {});
