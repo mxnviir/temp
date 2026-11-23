@@ -69,6 +69,7 @@ button{cursor:pointer}
 .n-label{font-family:var(--f-mono);font-weight:600;font-size:19px;fill:var(--text);text-anchor:middle;dominant-baseline:central;pointer-events:none}
 .suspect{fill:var(--smoke);fill-opacity:.22;stroke:var(--smoke);stroke-opacity:.55;stroke-width:2}
 .dest{fill:#fff;fill-opacity:.07;stroke:#fff;stroke-width:3;stroke-dasharray:7 6;animation:spin 6s linear infinite;transform-box:fill-box;transform-origin:center}
+.dest.faint{stroke-opacity:.35;fill-opacity:0;animation:none}
 .dest.picked{stroke:var(--smoke);stroke-width:5;stroke-dasharray:none;fill:var(--smoke);fill-opacity:.25;animation:none}
 .cur-ring{fill:none;stroke-width:4;animation:pulse 1.4s ease-in-out infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -99,17 +100,23 @@ button{cursor:pointer}
 .tk{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px 3px 4px;font-size:12px;background:var(--raise);border:1px solid var(--line)}
 .tk b{font-family:var(--f-mono);min-width:22px;height:22px;border-radius:999px;display:inline-grid;place-items:center;color:var(--ink);font-size:12px}
 .tk.zero{opacity:.4}
-.cab b,.tbtn.cab{background:var(--cab)} .tram b,.tbtn.tram{background:var(--tram)} .metro b,.tbtn.metro{background:var(--metro)} .smoke b,.tbtn.smoke{background:var(--smoke)} .sprint b{background:var(--text)}
-.moves{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow:auto;padding-right:2px}
-.mrow{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:10px;background:var(--raise);border:1px solid transparent}
-.mrow.picked{border-color:var(--smoke);background:rgba(169,140,255,.12)}
-.node-chip{font-family:var(--f-mono);font-weight:600;font-size:16px;min-width:40px;text-align:center;padding:4px 0;border-radius:8px;background:var(--node);border:1px solid var(--node-edge)}
-.mrow .tix{display:flex;flex-wrap:wrap;gap:6px}
-.tbtn{border:0;border-radius:8px;padding:7px 12px;font-weight:600;font-size:13px;color:var(--ink);min-height:34px}
-.tbtn:hover{filter:brightness(1.12)}
-.pickbox{display:flex;flex-direction:column;gap:8px}
-.pickbox .tix{display:flex;gap:8px;flex-wrap:wrap}
-.pickbox .tbtn{padding:10px 16px;font-size:15px;min-height:42px}
+.tk.cab b{background:var(--cab)} .tk.tram b{background:var(--tram)} .tk.metro b{background:var(--metro)} .tk.smoke b{background:var(--smoke)} .tk.sprint b{background:var(--text)}
+.step{display:flex;flex-direction:column;gap:10px}
+.step-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.link{background:none;border:0;padding:4px 0;color:var(--smoke);font-size:13px;font-weight:600;text-decoration:underline;text-underline-offset:3px}
+.modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.mode{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:12px 12px 11px 16px;border-radius:12px;border:1px solid var(--line);background:var(--raise);position:relative;overflow:hidden;min-height:64px}
+.mode::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--mc)}
+.mode b{font-family:var(--f-display);font-weight:900;font-size:24px;letter-spacing:.05em;text-transform:uppercase;line-height:1;color:var(--mc)}
+.mode span{font-size:12px;color:var(--muted)}
+.mode:hover:not(:disabled){border-color:var(--mc)}
+.mode:disabled{opacity:.38;cursor:not-allowed}
+.mode.cab,.go.cab{--mc:var(--cab)} .mode.tram,.go.tram{--mc:var(--tram)} .mode.metro,.go.metro{--mc:var(--metro)} .mode.smoke,.go.smoke{--mc:var(--smoke)}
+.dests{display:flex;flex-wrap:wrap;gap:8px}
+.dest-btn{font-family:var(--f-mono);font-weight:600;font-size:18px;min-width:56px;min-height:48px;border-radius:10px;background:var(--node);border:2px solid var(--node-edge)}
+.dest-btn:hover{border-color:var(--text)}
+.dest-btn.on{background:var(--text);color:var(--ink);border-color:var(--text)}
+.primary.go{background:var(--mc);color:var(--ink)}
 .hint{color:var(--muted);font-size:13px;margin:0}
 .primary{border:0;border-radius:10px;padding:12px 16px;font-weight:600;background:var(--text);color:var(--ink);font-size:15px}
 .primary:hover{filter:brightness(.92)}
@@ -190,9 +197,9 @@ button{cursor:pointer}
       <div class="board-scroll" id="boardScroll"><svg id="map" viewBox="0 0 1000 1000" role="img" aria-label="Map of Port Veyra"></svg></div>
       <div class="zoom"><button type="button" data-act="zoom-out" aria-label="Zoom out">−</button><button type="button" data-act="zoom-in" aria-label="Zoom in">+</button></div>
       <div class="legend">
-        <span><i style="background:var(--cab)"></i>Cab · street to next crossing</span>
-        <span><i style="background:var(--tram)"></i>Tram · teal-ringed stops</span>
-        <span><i style="background:var(--metro)"></i>Metro · red-ringed stations</span>
+        <span><i style="background:var(--cab)"></i>Taxi · street to the next crossing</span>
+        <span><i style="background:var(--tram)"></i>Bus · teal-ringed stops</span>
+        <span><i style="background:var(--metro)"></i>Train · red-ringed stations, long jumps</span>
         <span><i style="background:repeating-linear-gradient(90deg,var(--smoke) 0 6px,transparent 6px 10px)"></i>Ferry · Smoke tickets only</span>
       </div>
     </section>
@@ -212,8 +219,8 @@ const NS = 'http://www.w3.org/2000/svg';
 const COLS = 8, ROWS = 8, BRIDGES = [1, 4, 6];
 const MOVES_TOTAL = 22, REVEALS = [3, 8, 13, 18, 22];
 const T_ORDER = ['cab', 'tram', 'metro', 'smoke'];
-const T_LABEL = {cab:'Cab', tram:'Tram', metro:'Metro', smoke:'Smoke', ferry:'Ferry', sprint:'Sprint'};
-const T_SHORT = {cab:'CAB', tram:'TRM', metro:'MET', smoke:'SMK'};
+const T_LABEL = {cab:'Taxi', tram:'Bus', metro:'Train', smoke:'Smoke', ferry:'Ferry', sprint:'Sprint'};
+const T_SHORT = {cab:'TAXI', tram:'BUS', metro:'TRN', smoke:'SMK'};
 const AGENT_COLORS = ['#5cb8ff', '#ff7ac0', '#b4e468', '#e8edf6'];
 const AGENT_DEFAULTS = ['Harrow', 'Quill', 'Marlow', 'Vance'];
 const SAVE_KEY = 'shadow-trail-v1';
@@ -312,7 +319,7 @@ function newGame(cfg){
     v:1, shadowName:(cfg.shadowName || '').trim() || 'Shadow', agents,
     shadow:{pos:pool[0], tickets:{cab:4, tram:3, metro:3, smoke:agents.length + 1, sprint:2}},
     shadowStart:pool[0], log:[], phase:'shadow', view:'cover-shadow', turnAgent:0,
-    sprint:{active:false, step:0}, shadowDone:false, turnMoves:[], tracker:cfg.tracker,
+    mode:null, sprint:{active:false, step:0}, shadowDone:false, turnMoves:[], tracker:cfg.tracker,
     suspects:START_POOL.filter(n => !agents.some(a => a.pos === n)), lastReveal:null, spottedFresh:false,
     roundMoved:false, selected:null, winner:null, reason:'', trails:agents.map(a => [a.pos])
   };
@@ -365,7 +372,7 @@ function doShadowMove(to, ticket){
   state.turnMoves.push({ticket, node:to, reveal, move:moveNo});
   updateSuspects(ticket, reveal ? to : null);
   if (reveal){ state.lastReveal = {node:to, move:moveNo}; state.spottedFresh = true; }
-  state.selected = null;
+  state.selected = null; state.mode = null;
   if (state.sprint.active && state.sprint.step === 1 && state.log.length < MOVES_TOTAL && shadowOptions().size){
     state.sprint.step = 2;
   } else {
@@ -378,27 +385,27 @@ function doShadowMove(to, ticket){
 function doAgentMove(to, ticket){
   const i = state.turnAgent, a = state.agents[i];
   a.tickets[ticket]--; state.shadow.tickets[ticket]++;
-  a.pos = to; state.trails[i].push(to); state.roundMoved = true; state.selected = null;
+  a.pos = to; state.trails[i].push(to); state.roundMoved = true; state.selected = null; state.mode = null;
   if (to === state.shadow.pos){ endGame('agents', `${a.name} walked into crossing ${to} and caught the Shadow.`); return; }
   state.suspects = state.suspects.filter(n => n !== to);
   nextAgent();
 }
 function nextAgent(){
   state.turnAgent++;
-  state.selected = null;
+  state.selected = null; state.mode = null;
   if (state.turnAgent >= state.agents.length) endRound();
   else { save(); render(); centerOn(state.agents[state.turnAgent].pos); }
 }
 function endRound(){
   if (!state.roundMoved) return endGame('shadow', 'None of the agents could make a move, so the Shadow slipped away.');
-  if (state.log.length >= MOVES_TOTAL) return endGame('shadow', `The Shadow stayed loose for all ${MOVES_TOTAL} moves.`);
+  if (state.log.length >= MOVES_TOTAL) return endGame('shadow', `The Shadow stayed loose for all ${MOVES_TOTAL} turns.`);
   if (shadowOptions().size === 0) return endGame('agents', `The Shadow is cornered at ${state.shadow.pos} with nowhere left to go.`);
   state.phase = 'shadow'; state.view = 'cover-shadow';
   state.shadowDone = false; state.turnMoves = []; state.spottedFresh = false; state.roundMoved = false; state.turnAgent = 0;
   save(); render();
 }
 function endGame(winner, reason){
-  state.phase = 'over'; state.view = 'end'; state.winner = winner; state.reason = reason; state.selected = null;
+  state.phase = 'over'; state.view = 'end'; state.winner = winner; state.reason = reason; state.selected = null; state.mode = null;
   save(); render();
 }
 
@@ -484,7 +491,10 @@ function renderBoard(){
     mk('text', {x:n.x, y:n.y - 51, class:'seen-text'}, L.hl).textContent = 'SEEN · ' + state.lastReveal.move;
   }
   const opts = currentOptions();
-  for (const id of opts.keys()) mk('circle', {cx:N(id).x, cy:N(id).y, r:29, class:'dest' + (state.selected === id ? ' picked' : '')}, L.hl);
+  for (const [id, set] of opts){
+    if (state.mode && !set.has(state.mode)) continue;
+    mk('circle', {cx:N(id).x, cy:N(id).y, r:29, class:'dest' + (!state.mode ? ' faint' : '') + (state.selected === id ? ' picked' : '')}, L.hl);
+  }
 
   state.agents.forEach((a, i) => {
     const n = N(a.pos);
@@ -503,29 +513,37 @@ function renderBoard(){
 
 function onNodeTap(id){
   if (!state || screen !== 'game') return;
-  const opts = currentOptions();
-  state.selected = opts.has(id) ? id : null;
+  if (!state.mode) return;
+  const set = currentOptions().get(id);
+  state.selected = set && set.has(state.mode) ? id : null;
   render();
 }
 
 /* ---------- Panel ---------- */
 const wallet = (T, keys) => `<div class="wallet">${keys.map(k => `<span class="tk ${k}${T[k] ? '' : ' zero'}"><b>${T[k]}</b>${T_LABEL[k]}</span>`).join('')}</div>`;
-const tixButtons = (to, set) => T_ORDER.filter(t => set.has(t)).map(t => `<button type="button" class="tbtn ${t}" data-act="move" data-to="${to}" data-t="${t}">${T_LABEL[t]}</button>`).join('');
-function moveList(opts){
-  const ids = [...opts.keys()].sort((a, b) => a - b);
-  return `<div class="moves">${ids.map(id => `<div class="mrow${state.selected === id ? ' picked' : ''}" data-row="${id}"><span class="node-chip">${id}</span><div class="tix">${tixButtons(id, opts.get(id))}</div></div>`).join('')}</div>`;
-}
-function pickBox(opts){
-  if (state.selected && opts.has(state.selected))
-    return `<div class="pickbox"><span class="eyebrow">Go to ${state.selected} by</span><div class="tix">${tixButtons(state.selected, opts.get(state.selected))}</div></div>`;
-  return `<p class="hint">Tap a crossing with a dashed ring on the map, or pick a ticket from the list.</p>`;
+const goLabel = (m, id) => m === 'smoke' ? `Use Smoke to reach ${id}` : `Take the ${T_LABEL[m]} to ${id}`;
+function transportStep(opts, T, kinds){
+  const reach = k => [...opts.values()].filter(set => set.has(k)).length;
+  if (!state.mode){
+    return `<div class="step"><span class="eyebrow">Step 1 · Choose how to travel</span><div class="modes">${kinds.map(k => {
+      const n = reach(k), off = !T[k] || !n;
+      return `<button type="button" class="mode ${k}" data-act="mode" data-m="${k}"${off ? ' disabled' : ''}><b>${T_LABEL[k]}</b><span>${T[k]} ticket${T[k] === 1 ? '' : 's'} · ${!T[k] ? 'none left' : n ? n + ' place' + (n > 1 ? 's' : '') + ' to go' : 'no route from here'}</span></button>`;
+    }).join('')}</div></div>`;
+  }
+  const dests = [...opts.keys()].filter(id => opts.get(id).has(state.mode)).sort((a, b) => a - b);
+  let h = `<div class="step"><div class="step-head"><span class="eyebrow">Step 2 · Choose where to go by ${T_LABEL[state.mode]}</span><button type="button" class="link" data-act="mode" data-m="">Change transport</button></div>
+    <div class="dests">${dests.map(id => `<button type="button" class="dest-btn${state.selected === id ? ' on' : ''}" data-act="pick" data-to="${id}">${id}</button>`).join('')}</div>`;
+  h += state.selected && dests.includes(state.selected)
+    ? `<button type="button" class="primary go ${state.mode}" data-act="go">${goLabel(state.mode, state.selected)}</button>`
+    : `<p class="hint">Tap a number above, or a ringed crossing on the map.</p>`;
+  return h + '</div>';
 }
 function logGrid(showAll){
   let h = '<div class="tlog">';
   for (let i = 1; i <= MOVES_TOTAL; i++){
     const e = state.log[i - 1], rv = REVEALS.includes(i);
     const node = e && (showAll || e.reveal) ? `<span class="p">${e.node}</span>` : '';
-    h += `<div class="slot${e ? ' t-' + e.ticket : ''}${rv ? ' reveal' : ''}" title="Move ${i}${rv ? ' (sighting)' : ''}"><span class="n">${i}</span>${e ? `<span class="v">${T_SHORT[e.ticket]}</span>` : (rv ? '<span class="v">SEEN</span>' : '')}${node}</div>`;
+    h += `<div class="slot${e ? ' t-' + e.ticket : ''}${rv ? ' reveal' : ''}" title="Turn ${i}${rv ? ' (sighting)' : ''}"><span class="n">${i}</span>${e ? `<span class="v">${T_SHORT[e.ticket]}</span>` : (rv ? '<span class="v">SEEN</span>' : '')}${node}</div>`;
   }
   return h + '</div>';
 }
@@ -534,7 +552,7 @@ function logCard(showAll){
   const n = nextReveal();
   const trk = state.tracker && state.view !== 'end'
     ? `<button type="button" class="toggle" data-act="tracker" aria-pressed="${showSuspects}"><span>Show where the Shadow could be <b class="mono">(${state.suspects.length})</b></span><span class="sw"></span></button>` : '';
-  return `<div class="card"><div class="eyebrow">Shadow's travel log${n ? ` · next sighting on move ${n}` : ''}</div>${logGrid(showAll)}${trk}</div>`;
+  return `<div class="card"><div class="eyebrow">Shadow's travel log${n ? ` · next sighting on turn ${n}` : ''}</div>${logGrid(showAll)}${trk}</div>`;
 }
 function rosterCard(){
   return `<div class="card"><div class="eyebrow">Agents</div><div class="roster">${state.agents.map((a, i) => `
@@ -552,34 +570,34 @@ function renderPanel(){
     const moveNo = state.log.length + 1;
     h += `<div class="card turn-head"><span class="eyebrow">Secret turn · keep this screen to yourself</span>
       <h2><span class="diamond"></span>${esc(state.shadowName)}</h2>
-      <p>You are hiding at <b class="mono">${state.shadow.pos}</b>.${state.shadowDone ? '' : ` This is move <b class="mono">${moveNo}</b> of ${MOVES_TOTAL}.`}</p></div>`;
+      <p>You are hiding at <b class="mono">${state.shadow.pos}</b>.${state.shadowDone ? '' : ` This is turn <b class="mono">${moveNo}</b> of ${MOVES_TOTAL}.`}</p></div>`;
     if (state.shadowDone){
-      const lines = state.turnMoves.map(m => `<li>Move ${m.move}: ${T_LABEL[m.ticket]} to <b class="mono">${m.node}</b>${m.reveal ? ' (agents will see this)' : ''}</li>`).join('');
-      h += `<div class="card"><div class="eyebrow">Your move is in</div><ul style="margin:0;padding-left:18px">${lines}</ul>
+      const lines = state.turnMoves.map(m => `<li>Turn ${m.move}: ${T_LABEL[m.ticket]} to <b class="mono">${m.node}</b>${m.reveal ? ' (agents will see this)' : ''}</li>`).join('');
+      h += `<div class="card"><div class="eyebrow">Your turn is done</div><ul style="margin:0;padding-left:18px">${lines}</ul>
         <p class="hint">Hide the screen, then hand the device to the agents.</p>
         <button type="button" class="primary" data-act="pass">Hide and pass to the agents</button></div>`;
     } else {
       const opts = shadowOptions();
-      if (REVEALS.includes(moveNo)) h += `<div class="alert hot">Move ${moveNo} is a sighting. The agents will see where you land.</div>`;
-      if (state.sprint.step === 2) h += `<div class="alert">Sprint: make your second move now.</div>`;
-      h += `<div class="card">${pickBox(opts)}${moveList(opts)}</div>`;
+      if (REVEALS.includes(moveNo)) h += `<div class="alert hot">Turn ${moveNo} is a sighting. The agents will see where you land.</div>`;
+      if (state.sprint.step === 2) h += `<div class="alert">Sprint: make your second move now. It uses turn ${moveNo} of the log.</div>`;
+      h += `<div class="card">${transportStep(opts, state.shadow.tickets, ['cab','tram','metro','smoke'])}</div>`;
       const T = state.shadow.tickets;
       const canSprint = T.sprint > 0 && state.sprint.step !== 2 && state.log.length <= MOVES_TOTAL - 2;
       h += `<div class="card"><div class="eyebrow">Your tickets</div>${wallet(T, ['cab','tram','metro','smoke','sprint'])}
-        ${canSprint ? `<button type="button" class="toggle" data-act="sprint" aria-pressed="${state.sprint.active}"><span><b>Sprint</b> · move twice this turn</span><span class="sw"></span></button>` : ''}
+        ${canSprint ? `<button type="button" class="toggle" data-act="sprint" aria-pressed="${state.sprint.active}"><span><b>Sprint</b> · move twice in a row (uses 2 turns)</span><span class="sw"></span></button>` : ''}
         <p class="hint">Smoke hides which transport you took and is the only ticket that rides the ferry.</p></div>`;
     }
     h += logCard(true);
   }
   if (v === 'agents'){
     const a = state.agents[state.turnAgent], opts = agentOptions(state.turnAgent);
-    if (state.spottedFresh && state.lastReveal) h += `<div class="alert hot">Sighting: the Shadow was seen at <b>${state.lastReveal.node}</b> on move ${state.lastReveal.move}.</div>`;
+    if (state.spottedFresh && state.lastReveal) h += `<div class="alert hot">Sighting: the Shadow was seen at <b>${state.lastReveal.node}</b> on turn ${state.lastReveal.move}.</div>`;
     const last = state.log[state.log.length - 1];
-    h += `<div class="card turn-head"><span class="eyebrow">Agent ${state.turnAgent + 1} of ${state.agents.length}</span>
+    h += `<div class="card turn-head"><span class="eyebrow">Turn ${state.log.length} · agent ${state.turnAgent + 1} of ${state.agents.length}</span>
       <h2><span class="dot" style="color:${a.color};background:${a.color}"></span>${esc(a.name)}</h2>
       <p>At <b class="mono">${a.pos}</b>. The Shadow's last ticket: <b>${last ? T_LABEL[last.ticket] : '—'}</b>.</p></div>`;
     if (opts.size){
-      h += `<div class="card">${pickBox(opts)}${moveList(opts)}${wallet(a.tickets, ['cab','tram','metro'])}</div>`;
+      h += `<div class="card">${transportStep(opts, a.tickets, ['cab','tram','metro'])}</div>`;
     } else {
       h += `<div class="card"><p>${esc(a.name)} has no legal move from ${a.pos} and sits this turn out.</p><button type="button" class="secondary" data-act="skip">Next agent</button></div>`;
     }
@@ -590,13 +608,13 @@ function renderPanel(){
     const seen = state.log.filter(e => e.reveal).length, smoke = state.log.filter(e => e.ticket === 'smoke').length;
     h += `<div class="card result"><span class="eyebrow">Game over</span><h2>${win ? 'The agents win' : esc(state.shadowName) + ' escapes'}</h2>
       <p class="hint" style="font-size:15px">${esc(state.reason)}</p>
-      <div class="stats"><div class="stat"><b>${state.log.length}</b><span>Moves</span></div><div class="stat"><b>${seen}</b><span>Sightings</span></div><div class="stat"><b>${smoke}</b><span>Smoke used</span></div></div>
+      <div class="stats"><div class="stat"><b>${state.log.length}</b><span>Turns</span></div><div class="stat"><b>${seen}</b><span>Sightings</span></div><div class="stat"><b>${smoke}</b><span>Smoke used</span></div></div>
       <p class="hint">The violet line on the map is the Shadow's full route, starting at ${state.shadowStart}.</p>
       <button type="button" class="primary" data-act="again">Play again</button></div>`;
     h += logCard(true) + rosterCard();
   }
   p.innerHTML = h;
-  const row = p.querySelector('.mrow.picked');
+  const row = p.querySelector('.dest-btn.on');
   if (row) row.scrollIntoView({block:'nearest'});
 }
 
@@ -604,7 +622,12 @@ function renderStatus(){
   const s = $('#status');
   if (screen !== 'game' || !state){ s.innerHTML = ''; return; }
   const n = nextReveal();
-  s.innerHTML = `Move <b>${state.log.length}</b>/${MOVES_TOTAL}${n && state.view !== 'end' ? ` · sighting on <b>${n}</b>` : ''}`;
+  const shadowTurn = state.phase === 'shadow' && !state.shadowDone;
+  const turn = Math.min(MOVES_TOTAL, Math.max(1, state.log.length + (shadowTurn ? 1 : 0)));
+  const who = state.phase === 'over' ? 'game over'
+    : state.phase === 'shadow' ? esc(state.shadowName) + "'s turn"
+    : state.view === 'cover-agents' ? "agents' turn" : esc(state.agents[state.turnAgent].name) + "'s turn";
+  s.innerHTML = `Turn <b>${turn}</b>/${MOVES_TOTAL} · <b>${who}</b>${n && state.phase !== 'over' ? ` · sighting on turn ${n}` : ''}`;
 }
 
 /* ---------- Overlays ---------- */
@@ -617,13 +640,13 @@ function renderSetup(){
   const c = setupCfg;
   o.innerHTML = `<form class="sheet" id="setupForm" autocomplete="off">
     <div><div class="eyebrow">Pass-and-play · 3 to 5 players · one device</div><h1>Shadow Trail</h1></div>
-    <p>One player is the Shadow, moving in secret through Port Veyra. Everyone else runs the agents and tries to corner them before move ${MOVES_TOTAL}.</p>
+    <p>One player is the Shadow, moving in secret through Port Veyra. Everyone else runs the agents and tries to corner them before turn ${MOVES_TOTAL} ends.</p>
     <div class="field"><label for="shadowName">Shadow player</label><input type="text" id="shadowName" maxlength="18" value="${esc(c.shadowName)}"></div>
     <div class="field"><span class="lbl">Agents</span><div class="seg">${[2,3,4].map(k => `<button type="button" data-act="count" data-n="${k}" aria-pressed="${c.count === k}">${k}</button>`).join('')}</div></div>
     <div class="agent-names">${c.names.slice(0, c.count).map((nm, i) => `<div class="an"><span class="dot" style="color:${AGENT_COLORS[i]};background:${AGENT_COLORS[i]}"></span><input type="text" id="agent${i}" maxlength="14" value="${esc(nm)}" aria-label="Agent ${i + 1} name" style="background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:8px 10px;width:100%;min-width:0"></div>`).join('')}</div>
     <button type="button" class="toggle" data-act="setup-tracker" aria-pressed="${c.tracker}"><span><b>Hideout tracker</b> · shade every crossing the Shadow could be on</span><span class="sw"></span></button>
     <details class="rules"><summary>How to play</summary>${rulesList()}</details>
-    <div class="actions">${resume ? `<button type="button" class="secondary" data-act="resume">Resume game (move ${saved.log.length})</button>` : ''}<button type="submit" class="primary">Start new game</button></div>
+    <div class="actions">${resume ? `<button type="button" class="secondary" data-act="resume">Resume game (turn ${Math.max(1, saved.log.length)})</button>` : ''}<button type="submit" class="primary">Start new game</button></div>
   </form>`;
   $('#setupForm').addEventListener('submit', e => { e.preventDefault(); readSetup(); newGame(setupCfg); });
 }
@@ -633,13 +656,13 @@ function readSetup(){
 }
 function rulesList(){
   return `<ul>
-    <li><b>Turn order.</b> The Shadow moves first, in secret. Then every agent moves once, in order.</li>
-    <li><b>Tickets.</b> Each move along a line costs that line's ticket: <b>Cab</b> (amber streets), <b>Tram</b> (teal), <b>Metro</b> (red, long jumps). Agents start with 10 / 8 / 4.</li>
-    <li><b>The log.</b> Agents see which ticket the Shadow used, never where it went, except on sighting moves <b>${REVEALS.join(', ')}</b>.</li>
-    <li><b>Smoke</b> tickets hide the transport used and are the only way onto the <b>ferry</b>. <b>Sprint</b> lets the Shadow move twice in one turn.</li>
+    <li><b>Turns.</b> Each turn the Shadow moves first, in secret. Then every agent moves once, in order. The game lasts ${MOVES_TOTAL} turns.</li>
+    <li><b>Moving.</b> First pick how to travel, then pick where. <b>Taxi</b> follows the yellow streets, <b>Bus</b> the teal lines, <b>Train</b> the red lines (long jumps). Each trip costs one ticket of that kind. Agents start with 10 taxi, 8 bus and 4 train tickets.</li>
+    <li><b>The log.</b> Agents see which ticket the Shadow used, never where it went, except on sighting turns <b>${REVEALS.join(', ')}</b>.</li>
+    <li><b>Smoke</b> tickets hide the transport used and are the only way onto the <b>ferry</b>. <b>Sprint</b> lets the Shadow move twice in a row, using two turns of the log.</li>
     <li><b>Spent tickets.</b> Every ticket an agent spends goes to the Shadow.</li>
     <li><b>Blocking.</b> Nobody can move onto a crossing an agent is standing on.</li>
-    <li><b>Winning.</b> Agents win by landing on the Shadow or leaving it no move. The Shadow wins by lasting ${MOVES_TOTAL} moves, or if no agent can move.</li>
+    <li><b>Winning.</b> Agents win by landing on the Shadow or leaving it no move. The Shadow wins by lasting ${MOVES_TOTAL} turns, or if no agent can move.</li>
   </ul>`;
 }
 function renderCover(){
@@ -649,14 +672,14 @@ function renderCover(){
   if (!on) return;
   if (state.view === 'cover-shadow'){
     const first = state.log.length === 0;
-    o.innerHTML = `<div class="sheet cover"><div class="big diamond"></div><div class="eyebrow">Move ${state.log.length + 1} of ${MOVES_TOTAL}</div>
+    o.innerHTML = `<div class="sheet cover"><div class="big diamond"></div><div class="eyebrow">Turn ${state.log.length + 1} of ${MOVES_TOTAL}</div>
       <h1>Pass to ${esc(state.shadowName)}</h1>
       <p>Agents, look away. Only the Shadow should see the next screen${first ? ', which shows where the Shadow starts' : ''}.</p>
       <button type="button" class="primary" data-act="show-shadow">I'm ${esc(state.shadowName)}. Show my position</button></div>`;
   } else {
     const m = state.turnMoves.length;
     o.innerHTML = `<div class="sheet cover"><div class="big" style="display:flex;gap:8px;justify-content:center;align-items:center;width:auto">${state.agents.map(a => `<span class="dot" style="width:22px;height:22px;color:${a.color};background:${a.color}"></span>`).join('')}</div>
-      <div class="eyebrow">The Shadow moved ${m === 2 ? 'twice' : 'once'}</div>
+      <div class="eyebrow">Turn ${state.log.length} of ${MOVES_TOTAL} · the Shadow moved ${m === 2 ? 'twice' : 'once'}</div>
       <h1>Agents' turn</h1>
       <p>Shadow, hand the device over now.${state.spottedFresh ? ' There is a sighting waiting.' : ''}</p>
       <button type="button" class="primary" data-act="show-agents">Agents ready</button></div>`;
@@ -699,8 +722,11 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const act = b.dataset.act;
   switch (act){
-    case 'move': {
-      const to = +b.dataset.to, t = b.dataset.t;
+    case 'mode': state.mode = b.dataset.m || null; state.selected = null; render(); break;
+    case 'pick': state.selected = +b.dataset.to; render(); break;
+    case 'go': {
+      const to = state.selected, t = state.mode;
+      if (!to || !t) break;
       if (state.view === 'shadow') doShadowMove(to, t); else if (state.view === 'agents') doAgentMove(to, t);
       break; }
     case 'sprint':
@@ -708,7 +734,7 @@ document.addEventListener('click', e => {
       break;
     case 'pass': state.phase = 'agents'; state.view = 'cover-agents'; state.turnAgent = 0; save(); render(); break;
     case 'show-shadow':
-      state.view = 'shadow'; state.selected = null; save(); render(); centerOn(state.shadow.pos);
+      state.view = 'shadow'; state.selected = null; state.mode = null; save(); render(); centerOn(state.shadow.pos);
       if (shadowOptions().size === 0) endGame('agents', `The Shadow is cornered at ${state.shadow.pos} with nowhere left to go.`);
       break;
     case 'show-agents': state.view = 'agents'; save(); render(); centerOn(state.agents[0].pos); break;
