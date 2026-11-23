@@ -495,7 +495,7 @@ let customImage = null;
    ===================================================================== */
 const DEFAULT_CFG = {
   shadowName:'Shadow', agentCount:3, agentNames:AGENT_DEFAULTS.slice(), placement:'random', map:'builtin',
-  tickets:{taxi:20, bus:10, train:5}, smoke:5, doubles:2, doubleOn:true, turns:24, revealsText:'3, 8, 13, 18, 24',
+  tickets:{taxi:20, bus:10, train:5}, smoke:5, doubles:2, doubleOn:true, revealFirst:3, revealEvery:5,
   tracker:true, sound:true, motion:true
 };
 let setupCfg = Object.assign(clone(DEFAULT_CFG), Store.get(KEYS.setup) || {});
@@ -509,7 +509,7 @@ const ui = {mode:null, selected:null, inspect:null, paused:false, showSuspects:t
 const resetUi = () => { ui.mode = null; ui.selected = null; ui.inspect = null; };
 
 function saveGame(){ if (state) Store.set(KEYS.game, state); }
-function loadGame(){ const s = Store.get(KEYS.game); return s && s.v === 2 ? s : null; }
+function loadGame(){ const s = Store.get(KEYS.game); return s && s.v === 3 ? s : null; }
 
 let mapCache = {src:null, img:null, m:null};
 function MAP(){
@@ -520,16 +520,10 @@ function MAP(){
   return mapCache.m;
 }
 
-function parseReveals(text, turns){
-  const parts = String(text || '').split(/[\s,;]+/).filter(Boolean);
-  const list = [];
-  for (const p of parts){
-    const n = Number(p);
-    if (!Number.isInteger(n) || n < 1 || n > turns) return {error:`Sighting turns must be whole numbers between 1 and ${turns}. "${p}" is not.`};
-    if (!list.includes(n)) list.push(n);
-  }
-  return {list:list.sort((a, b) => a - b)};
-}
+/* Sightings count the Shadow's own moves: the first one, then every N moves after it, with no end. */
+const isSighting = (n, c) => n >= c.revealFirst && (n - c.revealFirst) % c.revealEvery === 0;
+const nextSighting = (n, c) => n < c.revealFirst ? c.revealFirst : c.revealFirst + Math.ceil((n + 1 - c.revealFirst) / c.revealEvery) * c.revealEvery;
+const sightingList = (c, k) => { const out = []; for (let n = c.revealFirst; out.length < k; n += c.revealEvery) out.push(n); return out; };
 
 /* PlayerManager + TurnManager */
 function newGame(cfg){
@@ -540,12 +534,12 @@ function newGame(cfg){
   const m = prepare(raw);
   const pool = m.starts.length >= players ? m.starts.slice() : m.nodes.map(n => n.id);
   state = {
-    v:2, cfg:clone(cfg), mapKey:cfg.map === 'custom' ? 'custom' : 'builtin', mapData:cfg.map === 'custom' ? clone(customRaw) : null,
+    v:3, cfg:clone(cfg), mapKey:cfg.map === 'custom' ? 'custom' : 'builtin', mapData:cfg.map === 'custom' ? clone(customRaw) : null,
     shadow:{name:(cfg.shadowName || '').trim() || 'Shadow', pos:null, start:null,
       tickets:Object.assign({}, cfg.tickets, {smoke:cfg.smoke, double:cfg.doubleOn ? cfg.doubles : 0})},
     agents:cfg.agentNames.slice(0, cfg.agentCount).map((n, i) => ({name:(n || '').trim() || AGENT_DEFAULTS[i], color:AGENT_COLORS[i], pos:null, start:null, tickets:Object.assign({}, cfg.tickets)})),
     pool, log:[], events:[], phase:'place', view:'', turnAgent:0, double:{armed:false, step:0},
-    shadowDone:false, agentsDone:false, turnMoves:[], suspects:[], lastReveal:null, spottedFresh:false, roundMoved:false,
+    shadowDone:false, agentsDone:false, turnMoves:[], stayed:false, round:1, suspects:[], lastReveal:null, spottedFresh:false,
     winner:null, reason:''
   };
   history = []; resetUi(); ui.replay = null; ui.setupErr = ''; ui.paused = false;
@@ -565,7 +559,6 @@ function beginPlay(direct){
   state.suspects = state.pool.filter(id => !state.agents.some(a => a.pos === id));
   state.phase = 'shadow';
   state.view = direct ? 'shadow' : 'cover-shadow';
-  if (direct && shadowOptions().size === 0) endGame('agents', `${state.shadow.name} has no way out of ${state.shadow.pos}.`);
 }
 
 /* MovementEngine */
@@ -633,16 +626,16 @@ function commitMove(){
 }
 function doShadowMove(to, t){
   pushHistory('shadow');
-  const turn = state.log.length + 1, reveal = state.cfg.reveals.includes(turn), from = state.shadow.pos;
+  const turn = state.log.length + 1, reveal = isSighting(turn, state.cfg), from = state.shadow.pos;
   if (state.double.armed && state.double.step === 1) state.shadow.tickets.double--;
   state.shadow.tickets[t]--;
   state.shadow.pos = to;
   state.log.push({turn, ticket:t, from, node:to, reveal});
-  state.events.push({k:'s', from, to, t, turn});
+  state.events.push({k:'s', from, to, t, turn, round:state.round});
   state.turnMoves.push({turn, ticket:t, from, node:to, reveal});
   updateSuspects(t, reveal ? to : null);
   if (reveal){ state.lastReveal = {node:to, turn}; state.spottedFresh = true; }
-  if (state.double.armed && state.double.step === 1 && state.log.length < state.cfg.turns && shadowOptions().size){
+  if (state.double.armed && state.double.step === 1 && shadowOptions().size){
     state.double.step = 2;
   } else {
     state.double = {armed:false, step:0};
@@ -653,8 +646,8 @@ function doShadowMove(to, t){
 function doAgentMove(to, t){
   pushHistory('agents');
   const i = state.turnAgent, a = state.agents[i], from = a.pos;
-  a.tickets[t]--; a.pos = to; state.roundMoved = true;
-  state.events.push({k:'a', i, from, to, t, turn:state.log.length});
+  a.tickets[t]--; a.pos = to;
+  state.events.push({k:'a', i, from, to, t, round:state.round});
   resetUi();
   if (to === state.shadow.pos){ endGame('agents', `${a.name} moved onto crossing ${to} and caught ${state.shadow.name}.`); return; }
   state.suspects = state.suspects.filter(n => n !== to);
@@ -668,15 +661,30 @@ function advanceAgent(){
   if (!state.agentsDone) View.centerOn(state.agents[state.turnAgent].pos);
 }
 function endRound(){
-  if (!state.roundMoved) return endGame('shadow', `None of the agents could move, so ${state.shadow.name} slipped away.`);
-  if (state.log.length >= state.cfg.turns) return endGame('shadow', `${state.shadow.name} stayed free for all ${state.cfg.turns} turns.`);
-  if (shadowOptions().size === 0) return endGame('agents', `${state.shadow.name} is cornered at ${state.shadow.pos} with no way out.`);
+  if (agentsStuck()) return;
+  state.round++;
   state.phase = 'shadow'; state.view = 'cover-shadow';
-  state.shadowDone = false; state.agentsDone = false; state.turnMoves = []; state.spottedFresh = false; state.roundMoved = false; state.turnAgent = 0;
+  state.shadowDone = false; state.agentsDone = false; state.turnMoves = []; state.stayed = false; state.spottedFresh = false; state.turnAgent = 0;
   history = [];
   resetUi(); saveGame(); render();
 }
-/* GameRules: end states */
+/* GameRules. The agents win only by moving onto the Shadow's real crossing.
+   The Shadow wins only when no agent has any legal move left: every agent's links and every remaining
+   ticket are checked, so running out of one ticket type does not count. There is no round limit. */
+function anyAgentCanMove(){ return state.agents.some((_, i) => agentOptions(i).size > 0); }
+function agentsStuck(){
+  if (anyAgentCanMove()) return false;
+  endGame('shadow', `No agent has a legal move left, so ${state.shadow.name} gets away after ${state.log.length} move${state.log.length === 1 ? '' : 's'}.`);
+  return true;
+}
+/* If the Shadow has no legal move it stays where it is. That is not a move, so it does not count toward sightings. */
+function shadowStay(){
+  pushHistory('shadow');
+  state.stayed = true; state.shadowDone = true; state.double = {armed:false, step:0};
+  state.events.push({k:'s', stay:true, from:state.shadow.pos, to:state.shadow.pos, t:null, turn:state.log.length, round:state.round});
+  resetUi(); saveGame(); render();
+}
+/* End states */
 function endGame(winner, reason){
   state.phase = 'over'; state.view = 'end'; state.winner = winner; state.reason = reason;
   history = []; resetUi(); ui.replay = state.events.length; ui.paused = false;
@@ -695,6 +703,7 @@ function viewModel(){
     shadow:priv ? {name:s.name, pos:s.pos, start:s.start, tickets:Object.assign({}, s.tickets)} : {name:s.name, pos:null, start:null, tickets:{smoke:s.tickets.smoke, double:s.tickets.double}},
     agents:state.agents.map(a => ({name:a.name, color:a.color, pos:a.pos, start:a.start, tickets:Object.assign({}, a.tickets)})),
     log:state.log.map(e => priv ? Object.assign({}, e) : {turn:e.turn, ticket:e.ticket, reveal:e.reveal, node:e.reveal ? e.node : null, from:null}),
+    sightings:state.log.filter(e => e.reveal).map(e => ({turn:e.turn, node:e.node})),
     agentEvents:state.events.filter(e => e.k === 'a'),
     events:priv ? state.events : null,
     lastReveal:state.lastReveal, suspects:state.suspects
@@ -858,7 +867,7 @@ function renderBoard(){
     const k = ui.replay == null ? P.events.length : ui.replay;
     agentPos = P.agents.map(a => a.start); shadowPos = P.shadow.start;
     const path = [shadowPos];
-    P.events.slice(0, k).forEach(e => { if (e.k === 's'){ shadowPos = e.to; path.push(e.to); } else agentPos[e.i] = e.to; });
+    P.events.slice(0, k).forEach(e => { if (e.k === 's'){ if (!e.stay){ shadowPos = e.to; path.push(e.to); } } else agentPos[e.i] = e.to; });
     mk('polyline', {points:path.map(id => `${N(id).px},${N(id).py}`).join(' '), class:'route', 'stroke-width':7 * s}, L.route);
     path.slice(1).forEach((id, i) => {
       const n = N(id);
@@ -870,7 +879,7 @@ function renderBoard(){
     const n = N(P.lastReveal.node);
     mk('circle', {cx:n.px, cy:n.py, r:R * 1.75, class:'seen-ring', 'stroke-width':3 * s, 'stroke-dasharray':`${4 * s} ${5 * s}`}, L.hl);
     mk('rect', {x:n.px - R * 2.1, y:n.py - R * 3.3, width:R * 4.2, height:R * 1.2, rx:R * .3, class:'seen-tag'}, L.hl);
-    mk('text', {x:n.px, y:n.py - R * 2.7, class:'seen-text', 'font-size':R * .72}, L.hl).textContent = 'SEEN · T' + P.lastReveal.turn;
+    mk('text', {x:n.px, y:n.py - R * 2.7, class:'seen-text', 'font-size':R * .72}, L.hl).textContent = 'SEEN · M' + P.lastReveal.turn;
   }
   const ring = (id, faint) => {
     const n = N(id), on = ui.selected === id;
@@ -939,27 +948,29 @@ function infoCard(P){
     <dl class="kv">${groups.map(([t, l]) => `<dt>${TK[t].label}</dt><dd>${l.join(', ')}</dd>`).join('') || '<dt>Links</dt><dd>none</dd>'}<dt>Here now</dt><dd>${here.join(', ') || 'nobody'}</dd></dl>${reach}</div>`;
 }
 function travelLog(P, showAll){
-  const total = state.cfg.turns, reveals = state.cfg.reveals, next = reveals.find(r => r > state.log.length);
+  const c = state.cfg, made = P.log.length, next = nextSighting(made, c);
+  const upto = Math.max(made, state.phase === 'over' ? made : next);
   let h = '<div class="tlog">';
-  for (let i = 1; i <= total; i++){
-    const e = P.log[i - 1], rv = reveals.includes(i);
+  for (let i = 1; i <= upto; i++){
+    const e = P.log[i - 1], rv = isSighting(i, c);
     const node = e && (showAll || e.reveal) && e.node != null ? `<span class="p">${e.node}</span>` : '';
-    h += `<div class="slot${e ? ' t-' + e.ticket : ''}${rv ? ' reveal' : ''}" title="Turn ${i}${rv ? ', sighting' : ''}"><span class="n">${i}</span>${e ? `<span class="v">${TK[e.ticket].short}</span>` : (rv ? '<span class="v">SEEN</span>' : '')}${node}</div>`;
+    h += `<div class="slot${e ? ' t-' + e.ticket : ''}${rv ? ' reveal' : ''}" title="Move ${i}${rv ? ', sighting' : ''}"><span class="n">${i}</span>${e ? `<span class="v">${TK[e.ticket].short}</span>` : (rv ? '<span class="v">SEEN</span>' : '')}${node}</div>`;
   }
   h += '</div>';
+  const seen = P.sightings.length ? `<p class="hint">Sightings: ${P.sightings.map(x => `move ${x.turn} at <b class="mono">${x.node}</b>`).join(' · ')}</p>` : '';
   const trk = state.cfg.tracker && state.view !== 'end'
     ? `<button type="button" class="toggle" data-act="tracker" aria-pressed="${ui.showSuspects}"><span>Shade where ${esc(P.shadow.name)} could be <b class="mono">(${P.suspects.length})</b></span><span class="sw"></span></button>` : '';
-  return `<div class="card"><div class="eyebrow">${esc(P.shadow.name)}'s travel log${next && state.phase !== 'over' ? ` · next sighting on turn ${next}` : ''}</div>${h}${trk}</div>`;
+  return `<div class="card"><div class="eyebrow">${esc(P.shadow.name)}'s travel log · ${made} move${made === 1 ? '' : 's'}${state.phase !== 'over' ? ` · next sighting after move ${next}` : ''}</div>${h}${seen}${trk}</div>`;
 }
 function agentLog(P){
   const ev = P.agentEvents.slice().reverse();
   return `<div class="card"><details class="fold"><summary><span class="eyebrow">Agent moves (${ev.length})</span></summary>
-    ${ev.length ? `<ul class="loglist" style="margin-top:10px">${ev.map(e => `<li><span class="tn">T${e.turn}</span><span class="tt k-${e.t}">${TK[e.t].label}</span><span class="tx">${esc(P.agents[e.i].name)} · ${e.from} → ${e.to}</span></li>`).join('')}</ul>` : '<p class="hint" style="margin-top:10px">No agent has moved yet.</p>'}</details></div>`;
+    ${ev.length ? `<ul class="loglist" style="margin-top:10px">${ev.map(e => `<li><span class="tn">R${e.round}</span><span class="tt k-${e.t}">${TK[e.t].label}</span><span class="tx">${esc(P.agents[e.i].name)} · ${e.from} → ${e.to}</span></li>`).join('')}</ul>` : '<p class="hint" style="margin-top:10px">No agent has moved yet.</p>'}</details></div>`;
 }
 function privateLog(P){
   const rows = P.log.slice().reverse();
   return `<div class="card"><span class="eyebrow">${state.view === 'end' ? esc(P.shadow.name) + "'s full route" : 'Your private route'}</span>
-    ${rows.length ? `<ul class="loglist">${rows.map(e => `<li><span class="tn">T${e.turn}</span><span class="tt k-${e.ticket}">${TK[e.ticket].label}</span><span class="tx">${e.from} → ${e.node}${e.reveal ? ' · seen' : ''}</span></li>`).join('')}</ul>` : ''}
+    ${rows.length ? `<ul class="loglist">${rows.map(e => `<li><span class="tn">M${e.turn}</span><span class="tt k-${e.ticket}">${TK[e.ticket].label}</span><span class="tx">${e.from} → ${e.node}${e.reveal ? ' · seen' : ''}</span></li>`).join('')}</ul>` : ''}
     <p class="hint">Started at ${P.shadow.start}.</p></div>`;
 }
 function roster(P){
@@ -991,38 +1002,45 @@ function renderPanel(){
     const turn = state.log.length + 1;
     h += `<div class="card turn-head"><span class="eyebrow">Secret turn · keep this screen to yourself</span>
       <h2><span class="diamond"></span>${esc(P.shadow.name)}</h2>
-      <p>You are hiding at <b class="mono">${P.shadow.pos}</b>.${state.shadowDone ? '' : ` This is turn <b class="mono">${turn}</b> of ${cfg.turns}.`}</p></div>`;
+      <p>You are hiding at <b class="mono">${P.shadow.pos}</b>. Round <b class="mono">${state.round}</b>.${state.shadowDone ? '' : ` Your next move is move <b class="mono">${turn}</b>.`}</p></div>`;
     if (state.shadowDone){
-      h += `<div class="card"><div class="eyebrow">Your turn is done</div><ul style="margin:0;padding-left:18px">${state.turnMoves.map(m => `<li>Turn ${m.turn}: ${TK[m.ticket].label} from ${m.from} to <b class="mono">${m.node}</b>${m.reveal ? ' (the agents will see this one)' : ''}</li>`).join('')}</ul>
+      h += `<div class="card"><div class="eyebrow">Your turn is done</div>${state.stayed ? `<p>You had no legal move, so you stay at <b class="mono">${P.shadow.pos}</b>. The agents will be told you stayed put.</p>` : ''}<ul style="margin:0;padding-left:18px">${state.turnMoves.map(m => `<li>Move ${m.turn}: ${TK[m.ticket].label} from ${m.from} to <b class="mono">${m.node}</b>${m.reveal ? ' (the agents will see this one)' : ''}</li>`).join('')}</ul>
         <p class="hint">Hide the screen, then hand the device to the agents.</p>
         <div class="confirm"><button type="button" class="primary" data-act="pass">Hide and pass to the agents</button><button type="button" class="secondary" data-act="undo"${canUndo() ? '' : ' disabled'}>Undo last move</button></div></div>`;
     } else {
       const opts = shadowOptions();
-      if (cfg.reveals.includes(turn)) h += `<div class="alert hot">Turn ${turn} is a sighting. The agents will see where you land.</div>`;
-      if (state.double.step === 2) h += `<div class="alert">Double move: make your second move now. It uses turn ${turn}.</div>`;
+      if (!opts.size){
+        h += `<div class="card"><div class="eyebrow">No legal move</div><p>Every link from ${P.shadow.pos} is blocked by an agent or needs a ticket you no longer have. You stay where you are this round.</p>
+          <button type="button" class="primary" data-act="shadow-stay">Stay at ${P.shadow.pos}</button></div>`;
+        h += infoCard(P) + privateLog(P) + travelLog(P, true);
+        $('#panel').innerHTML = h; return;
+      }
+      if (isSighting(turn, cfg)) h += `<div class="alert hot">Move ${turn} is a sighting. The agents will see where you land.</div>`;
+      if (state.double.step === 2) h += `<div class="alert">Double move: make your second move now. It is move ${turn}${isSighting(turn, cfg) ? ', a sighting' : ''}.</div>`;
       h += `<div class="card">${transportStep(opts, P.shadow.tickets, ['taxi','bus','train','smoke'])}${canUndo() ? '<button type="button" class="secondary small" data-act="undo">Undo your first move</button>' : ''}</div>`;
       const T = P.shadow.tickets;
-      const canDouble = cfg.doubleOn && T.double > 0 && state.double.step !== 2 && state.turnMoves.length === 0 && state.log.length <= cfg.turns - 2;
+      const canDouble = cfg.doubleOn && T.double > 0 && state.double.step !== 2 && state.turnMoves.length === 0;
       h += `<div class="card"><div class="eyebrow">Your tickets</div>${wallet(T, ['taxi','bus','train','smoke','double'])}
-        ${canDouble ? `<button type="button" class="toggle" data-act="double" aria-pressed="${state.double.armed}"><span><b>Double move</b> · move twice in a row, using 2 turns</span><span class="sw"></span></button>` : ''}
+        ${canDouble ? `<button type="button" class="toggle" data-act="double" aria-pressed="${state.double.armed}"><span><b>Double move</b> · move twice in a row this round</span><span class="sw"></span></button>` : ''}
         <p class="hint">Smoke hides which transport you took and is the only ticket that rides the ferry.</p></div>`;
     }
     h += infoCard(P) + privateLog(P) + travelLog(P, true);
   }
   if (v === 'agents'){
     const a = state.agents[state.turnAgent];
-    if (state.spottedFresh && P.lastReveal) h += `<div class="alert hot">Sighting: ${esc(P.shadow.name)} was seen at <b>${P.lastReveal.node}</b> on turn ${P.lastReveal.turn}.</div>`;
+    if (state.spottedFresh && P.lastReveal) h += `<div class="alert hot">Sighting: ${esc(P.shadow.name)} was seen at <b>${P.lastReveal.node}</b> after move ${P.lastReveal.turn}.</div>`;
+    if (state.stayed) h += `<div class="alert">${esc(P.shadow.name)} had no legal move this round and stayed where they were.</div>`;
     const last = P.log[P.log.length - 1];
     if (state.agentsDone){
-      h += `<div class="card turn-head"><span class="eyebrow">Turn ${state.log.length} of ${cfg.turns}</span><h2>Agents done</h2><p>Every agent has had a go this turn.</p></div>
-        <div class="card"><div class="confirm"><button type="button" class="primary" data-act="end-round">${state.log.length >= cfg.turns ? 'Finish the game' : `End turn and pass to ${esc(P.shadow.name)}`}</button><button type="button" class="secondary" data-act="undo"${canUndo() ? '' : ' disabled'}>Undo last move</button></div></div>`;
+      h += `<div class="card turn-head"><span class="eyebrow">Round ${state.round}</span><h2>Agents done</h2><p>Every agent has had a go this round.</p></div>
+        <div class="card"><div class="confirm"><button type="button" class="primary" data-act="end-round">End round and pass to ${esc(P.shadow.name)}</button><button type="button" class="secondary" data-act="undo"${canUndo() ? '' : ' disabled'}>Undo last move</button></div></div>`;
     } else {
       const opts = agentOptions(state.turnAgent);
-      h += `<div class="card turn-head"><span class="eyebrow">Turn ${state.log.length} of ${cfg.turns} · agent ${state.turnAgent + 1} of ${state.agents.length}</span>
+      h += `<div class="card turn-head"><span class="eyebrow">Round ${state.round} · agent ${state.turnAgent + 1} of ${state.agents.length}</span>
         <h2><span class="dot" style="--c:${a.color}"></span>${esc(a.name)}</h2>
         <p>At <b class="mono">${a.pos}</b>. ${esc(P.shadow.name)}'s last ticket: <b>${last ? TK[last.ticket].label : 'none yet'}</b>.</p></div>`;
       h += opts.size ? `<div class="card">${transportStep(opts, a.tickets, MOVE_KINDS)}${canUndo() ? '<button type="button" class="secondary small" data-act="undo">Undo the previous agent\'s move</button>' : ''}</div>`
-        : `<div class="card"><p>${esc(a.name)} has no legal move from ${a.pos} and sits this turn out.</p><button type="button" class="secondary" data-act="skip">Next agent</button></div>`;
+        : `<div class="card"><p>${esc(a.name)} has no legal move from ${a.pos} with the tickets left, so sits this round out.</p><button type="button" class="secondary" data-act="skip">Next agent</button></div>`;
     }
     h += infoCard(P) + travelLog(P, false) + roster(P) + agentLog(P);
   }
@@ -1031,7 +1049,7 @@ function renderPanel(){
     const k = ui.replay == null ? P.events.length : ui.replay;
     h += `<div class="card result"><span class="eyebrow">Game over</span><h2>${win === 'agents' ? 'The agents win' : win === 'shadow' ? esc(P.shadow.name) + ' escapes' : 'Game ended'}</h2>
       <p class="hint" style="font-size:15px">${esc(state.reason)}</p>
-      <div class="stats"><div class="stat"><b>${state.log.length}</b><span>Turns</span></div><div class="stat"><b>${state.events.length}</b><span>Moves</span></div><div class="stat"><b>${seen}</b><span>Sightings</span></div></div>
+      <div class="stats"><div class="stat"><b>${state.round}</b><span>Rounds</span></div><div class="stat"><b>${state.log.length}</b><span>Shadow moves</span></div><div class="stat"><b>${seen}</b><span>Sightings</span></div></div>
       <button type="button" class="primary" data-act="menu">New game</button></div>
       <div class="card"><span class="eyebrow">Replay</span><div class="replay">
         <div class="rp-btns"><button type="button" class="secondary small" data-act="rp" data-d="-9999">« Start</button><button type="button" class="secondary small" data-act="rp" data-d="-1">‹ Back</button><button type="button" class="secondary small" data-act="rp-play" id="rpPlay">${ui.playing ? 'Pause' : 'Play'}</button><button type="button" class="secondary small" data-act="rp" data-d="1">Next ›</button><button type="button" class="secondary small" data-act="rp" data-d="9999">End »</button></div>
@@ -1046,7 +1064,8 @@ function replayText(k){
   if (k <= 0) return `Starting positions. ${esc(state.shadow.name)} began at ${state.shadow.start}.`;
   const e = state.events[k - 1];
   const who = e.k === 's' ? state.shadow.name : state.agents[e.i].name;
-  return `Move ${k} of ${state.events.length}, turn ${e.turn}: ${esc(who)} took the ${TK[e.t].label} from ${e.from} to ${e.to}.`;
+  if (e.stay) return `Step ${k} of ${state.events.length}, round ${e.round}: ${esc(who)} had no legal move and stayed at ${e.from}.`;
+  return `Step ${k} of ${state.events.length}, round ${e.round}: ${esc(who)} took the ${TK[e.t].label} from ${e.from} to ${e.to}${e.k === 's' ? ` (move ${e.turn})` : ''}.`;
 }
 
 function renderStatus(){
@@ -1056,13 +1075,12 @@ function renderStatus(){
   if (screen !== 'game' || !state){ s.innerHTML = ''; return; }
   const cfg = state.cfg;
   if (state.phase === 'place'){ s.innerHTML = '<b>Choosing starting spots</b>'; return; }
-  const shadowTurn = state.phase === 'shadow' && !state.shadowDone;
-  const turn = clamp(state.log.length + (shadowTurn ? 1 : 0), 1, cfg.turns);
+
   const who = state.phase === 'over' ? 'game over'
     : state.phase === 'shadow' ? esc(state.shadow.name) + "'s turn"
     : state.view === 'cover-agents' || state.agentsDone ? "agents' turn" : esc(state.agents[state.turnAgent].name) + "'s turn";
-  const next = cfg.reveals.find(r => r > state.log.length);
-  s.innerHTML = `Turn <b>${turn}</b>/${cfg.turns} · <b>${who}</b>${next && state.phase !== 'over' ? ` · sighting on turn ${next}` : ''}${ui.paused ? ' · <b>paused</b>' : ''}`;
+  const next = nextSighting(state.log.length, cfg);
+  s.innerHTML = `Round <b>${state.round}</b> · <b>${who}</b> · Shadow moves <b>${state.log.length}</b>${state.phase !== 'over' ? ` · next sighting after move ${next}` : ''}${ui.paused ? ' · <b>paused</b>' : ''}`;
 }
 function renderHeader(){
   const game = screen === 'game' && !!state;
@@ -1079,12 +1097,13 @@ function renderHeader(){
    ===================================================================== */
 function rulesList(c){
   return `<ul>
-    <li><b>Turns.</b> Each turn ${esc(c.shadowName || 'the Shadow')} moves first, in secret. Then every agent moves once, in order. The game lasts ${c.turns} turns.</li>
+    <li><b>Rounds.</b> Each round ${esc(c.shadowName || 'the Shadow')} moves first, in secret. Then every agent moves once, in order. There is no round limit.</li>
     <li><b>Moving.</b> Pick how to travel, then where. <b>Taxi</b> follows the yellow streets, <b>Bus</b> the teal lines, <b>Train</b> the red lines. Each trip costs one ticket of that kind. Every player starts with ${c.tickets.taxi} Taxi, ${c.tickets.bus} Bus and ${c.tickets.train} Train tickets.</li>
-    <li><b>The log.</b> Agents see which ticket the Shadow used, never where it went, except on sighting turns <b>${esc(c.revealsText)}</b>.</li>
-    <li><b>Smoke</b> tickets hide which transport the Shadow used and are the only way onto the <b>ferry</b>. A <b>Double move</b> lets the Shadow move twice in a row, using two turns.</li>
+    <li><b>Sightings.</b> Agents see which ticket the Shadow used, never where it went, except right after the Shadow's moves <b>${sightingList(c, 5).join(', ')}</b> and every ${c.revealEvery}th move after that. Only the Shadow's own moves count.</li>
+    <li><b>Smoke</b> tickets hide which transport the Shadow used and are the only way onto the <b>ferry</b>. A <b>Double move</b> lets the Shadow move twice in one round; both moves count toward sightings.</li>
+    <li><b>Stuck Shadow.</b> If every link from the Shadow's crossing is blocked or needs a ticket it lacks, the Shadow stays put for that round.</li>
     <li><b>Blocking.</b> Two agents can never share a crossing, and the Shadow cannot move onto an agent.</li>
-    <li><b>Winning.</b> Agents win by moving onto the Shadow, or by leaving it no move. The Shadow wins by staying free for all ${c.turns} turns, or if no agent can move.</li>
+    <li><b>Winning.</b> The agents win the moment one of them moves onto the Shadow's real crossing. The Shadow wins only when no agent has any legal move left with the tickets they hold. Running out of one ticket type does not knock an agent out.</li>
   </ul>`;
 }
 function renderSetup(){
@@ -1098,7 +1117,7 @@ function renderSetup(){
   const num = (id, label, val, max) => `<div class="field"><label for="${id}">${label}</label><input class="inp mono" type="number" inputmode="numeric" min="0" max="${max}" id="${id}" value="${val}"></div>`;
   o.innerHTML = `<form class="sheet wide" id="setupForm" autocomplete="off" novalidate>
     <div><div class="eyebrow">Pass-and-play · one device · 3 to 6 players</div><h1>Shadow Trail</h1></div>
-    <p>One player is the Shadow, moving in secret. Everyone else plays the agents together and tries to catch the Shadow before the last turn.</p>
+    <p>One player is the Shadow, moving in secret. Everyone else plays the agents together and keeps going until they catch the Shadow or run out of moves.</p>
     <fieldset><legend>Players</legend>
       <div class="field"><label for="f-shadow">Shadow player</label><input class="inp" type="text" id="f-shadow" maxlength="18" value="${esc(c.shadowName)}"></div>
       <div class="field"><span class="lbl">Number of agents</span><div class="seg">${[2,3,4,5].map(k => `<button type="button" data-act="set" data-k="agentCount" data-v="${k}" aria-pressed="${c.agentCount === k}">${k}</button>`).join('')}</div></div>
@@ -1120,9 +1139,9 @@ function renderSetup(){
       <div class="grid2">${num('f-smoke', 'Shadow Smoke tickets', c.smoke, 20)}${num('f-doubles', 'Shadow Double moves', c.doubles, 10)}</div>
       <button type="button" class="toggle" data-act="toggle" data-k="doubleOn" aria-pressed="${c.doubleOn}"><span><b>Double moves</b> · allow the Shadow to move twice in a row</span><span class="sw"></span></button>
     </fieldset>
-    <fieldset><legend>Turns</legend>
-      <div class="grid2">${num('f-turns', 'Number of turns', c.turns, 60)}<div class="field"><label for="f-reveals">Sighting turns</label><input class="inp mono" type="text" id="f-reveals" value="${esc(c.revealsText)}"></div></div>
-      <p class="hint">On sighting turns everyone sees where the Shadow lands. Separate the turn numbers with commas.</p>
+    <fieldset><legend>Sightings</legend>
+      <div class="grid2">${num('f-first', 'First sighting after move', c.revealFirst, 99)}${num('f-every', 'Then every … moves', c.revealEvery, 99)}</div>
+      <p class="hint">Sightings after moves ${sightingList(c, 7).join(', ')} and so on. The game has no round limit: it ends when an agent catches the Shadow or no agent can move.</p>
     </fieldset>
     <fieldset><legend>Options</legend>
       <button type="button" class="toggle" data-act="toggle" data-k="tracker" aria-pressed="${c.tracker}"><span><b>Hideout tracker</b> · shade every crossing the Shadow could be on</span><span class="sw"></span></button>
@@ -1132,7 +1151,7 @@ function renderSetup(){
     </fieldset>
     <details class="rules"><summary>How to play</summary>${rulesList(c)}</details>
     ${ui.setupErr ? `<p class="err-box" role="alert">${esc(ui.setupErr)}</p>` : ''}
-    <div class="actions">${resume ? `<button type="button" class="secondary" data-act="resume">Resume game (turn ${Math.max(1, saved.log.length)})</button>` : ''}<button type="submit" class="primary">Start new game</button></div>
+    <div class="actions">${resume ? `<button type="button" class="secondary" data-act="resume">Resume game (round ${saved.round})</button>` : ''}<button type="submit" class="primary">Start new game</button></div>
   </form>`;
 }
 function readSetup(){
@@ -1143,18 +1162,15 @@ function readSetup(){
   if (val('f-taxi') !== null){
     setupCfg.tickets = {taxi:n('f-taxi', 0, 99, 20), bus:n('f-bus', 0, 99, 10), train:n('f-train', 0, 99, 5)};
     setupCfg.smoke = n('f-smoke', 0, 20, 5); setupCfg.doubles = n('f-doubles', 0, 10, 2);
-    setupCfg.turns = n('f-turns', 3, 60, 24); setupCfg.revealsText = val('f-reveals');
+    setupCfg.revealFirst = n('f-first', 1, 99, 3); setupCfg.revealEvery = n('f-every', 1, 99, 5);
   }
   Store.set(KEYS.setup, setupCfg);
 }
 function startFromSetup(){
   readSetup();
   const c = setupCfg;
-  const r = parseReveals(c.revealsText, c.turns);
-  if (r.error){ ui.setupErr = r.error; renderSetup(); return; }
-  if (!r.list.length){ ui.setupErr = 'Add at least one sighting turn, or the agents will have nothing to go on.'; renderSetup(); return; }
   if (c.tickets.taxi + c.tickets.bus + c.tickets.train < 1){ ui.setupErr = 'Give every player at least one ticket.'; renderSetup(); return; }
-  newGame(Object.assign(clone(c), {reveals:r.list, revealsText:r.list.join(', ')}));
+  newGame(clone(c));
 }
 
 function renderCover(){
@@ -1165,14 +1181,14 @@ function renderCover(){
   const name = esc(state.shadow.name);
   if (state.view === 'cover-shadow' || state.view === 'cover-place-shadow'){
     const placing = state.view === 'cover-place-shadow', first = state.log.length === 0;
-    o.innerHTML = `<div class="sheet cover"><div class="big diamond"></div><div class="eyebrow">${placing ? 'Setting up' : `Turn ${state.log.length + 1} of ${state.cfg.turns}`}</div>
+    o.innerHTML = `<div class="sheet cover"><div class="big diamond"></div><div class="eyebrow">${placing ? 'Setting up' : `Round ${state.round}`}</div>
       <h1>Pass to ${name}</h1>
       <p>Agents, look away. Only ${name} should see the next screen${placing ? ', where they choose a hiding place' : first ? ', which shows where they start' : ''}.</p>
       <button type="button" class="primary" data-act="${placing ? 'show-place-shadow' : 'show-shadow'}">I'm ${name}. Show my screen</button></div>`;
   } else {
     const m = state.turnMoves.length;
     o.innerHTML = `<div class="sheet cover"><div style="display:flex;gap:10px;justify-content:center">${state.agents.map(a => `<span class="dot" style="--c:${a.color};width:22px;height:22px"></span>`).join('')}</div>
-      <div class="eyebrow">Turn ${state.log.length} of ${state.cfg.turns} · ${name} moved ${m === 2 ? 'twice' : 'once'}</div>
+      <div class="eyebrow">Round ${state.round} · ${state.stayed ? `${name} could not move` : `${name} moved ${m === 2 ? 'twice' : 'once'}`}</div>
       <h1>Agents' turn</h1>
       <p>${name}, hand the device over now.${state.spottedFresh ? ' A sighting is waiting.' : ''}</p>
       <button type="button" class="primary" data-act="show-agents">Agents ready</button></div>`;
@@ -1422,11 +1438,14 @@ document.addEventListener('click', e => {
     /* hand-offs */
     case 'show-shadow':
       state.view = 'shadow'; resetUi(); saveGame(); render(); View.centerOn(state.shadow.pos);
-      if (!state.shadowDone && shadowOptions().size === 0) endGame('agents', `${state.shadow.name} is cornered at ${state.shadow.pos} with no way out.`);
       break;
+    case 'shadow-stay': shadowStay(); break;
     case 'show-place-shadow': state.view = 'place-shadow'; resetUi(); saveGame(); render(); break;
     case 'show-agents': state.view = 'agents'; resetUi(); saveGame(); render(); View.centerOn(state.agents[state.turnAgent].pos); break;
-    case 'pass': state.phase = 'agents'; state.view = 'cover-agents'; state.turnAgent = 0; state.agentsDone = false; history = []; resetUi(); saveGame(); render(); break;
+    case 'pass':
+      state.phase = 'agents'; state.turnAgent = 0; state.agentsDone = false; history = []; resetUi();
+      if (agentsStuck()) break;
+      state.view = 'cover-agents'; saveGame(); render(); break;
     case 'end-round': endRound(); break;
     case 'skip': pushHistory('agents'); resetUi(); advanceAgent(); break;
     /* moving */
