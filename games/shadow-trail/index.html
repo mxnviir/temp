@@ -1468,7 +1468,7 @@ document.addEventListener('click', e => {
       openModal(`<h3>Export map</h3><p>Copy this text to keep a backup or move the map to another device. The background picture is not included.</p>
         <textarea class="inp" id="exportText" readonly>${esc(json)}</textarea>
         <div class="actions"><button type="button" class="primary" data-act="copy-export">Copy</button><a class="secondary filebtn" id="dlLink" download="shadow-trail-map.json">Download file</a><button type="button" class="secondary" data-act="close">Close</button></div><p class="hint" id="copyMsg"></p>`);
-      try { $('#dlLink').href = URL.createObjectURL(new Blob([json], {type:'application/json'})); } catch (err) { $('#dlLink').hidden = true; }
+      try { if (window.claude) throw 0; $('#dlLink').href = URL.createObjectURL(new Blob([json], {type:'application/json'})); } catch (err) { $('#dlLink').hidden = true; }
       break; }
     case 'copy-export': {
       const t = $('#exportText');
